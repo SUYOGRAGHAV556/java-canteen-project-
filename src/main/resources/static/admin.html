@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Owner & Admin Portal | Smart Canteen Management</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN for Peak Rush & Sales Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- SockJS and STOMP Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="min-h-full flex flex-col bg-slate-100/70 text-slate-800 antialiased pb-12 relative">
+
+    <!-- OWNER AUTHENTICATION SECURITY GATE MODAL -->
+    <div id="adminAuthModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div id="adminAuthCard" class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-7 space-y-5 border border-slate-200 text-center animate-slide-up">
+            
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-700 text-white flex items-center justify-center text-3xl mx-auto shadow-xl shadow-slate-900/20">
+                🔒
+            </div>
+
+            <div>
+                <h2 class="text-xl font-black text-slate-900 tracking-tight">Canteen Owner Portal</h2>
+                <p class="text-xs text-slate-500 font-medium mt-1">Authorized Owner & Management Access Only</p>
+            </div>
+
+            <!-- Error Banner -->
+            <div id="adminAuthError" class="hidden bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold p-3 rounded-xl text-left animate-pulse">
+                ⚠️ Incorrect Owner Password. Please try again.
+            </div>
+
+            <!-- Password Form -->
+            <form onsubmit="handleAdminLogin(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Owner Security Passcode</label>
+                    <div class="relative">
+                        <input type="password" id="adminPasswordInput" placeholder="Enter owner password (e.g. owner123)" required
+                               class="w-full pl-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-slate-900">
+                        <button type="button" onclick="togglePasswordVisibility('adminPasswordInput', this)" class="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 text-xs font-bold">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+                    <span>Default PIN / Password:</span>
+                    <button type="button" onclick="quickFillAdminPass()" class="font-bold text-orange-600 hover:text-orange-700 underline">
+                        👑 Quick Fill: owner123
+                    </button>
+                </div>
+
+                <button type="submit" id="adminLoginBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-sm py-3.5 rounded-xl shadow-xl shadow-slate-900/25 active:scale-98 transition flex items-center justify-center gap-2">
+                    <span>🔓 Unlock Owner Dashboard</span>
+                </button>
+            </form>
+
+            <div class="pt-2 border-t border-slate-100 text-center">
+                <a href="/" class="text-xs font-bold text-slate-500 hover:text-slate-800">➔ Return to Student Portal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOP HEADER -->
+    <header class="bg-white border-b border-slate-200 px-6 py-3.5 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white text-xl shadow-md">
+                    ⚙️
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                        Canteen Owner & Admin Portal
+                        <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-300 font-mono">👑 OWNER</span>
+                    </h1>
+                    <p class="text-xs text-slate-500 font-medium">Simplified Control Panel • Zero-Clutter Management</p>
+                </div>
+            </div>
+
+            <!-- Portal Links, Live WS Indicator & Logout -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Live STOMP Stream
+                </div>
+                
+                <a href="/" target="_blank" class="text-xs font-bold px-3 py-2 rounded-xl bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition">
+                    📱 Student App
+                </a>
+                <a href="/kds.html" target="_blank" class="text-xs font-bold px-3 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition">
+                    👨‍🍳 Kitchen KDS
+                </a>
+
+                <!-- Lock Dashboard Button -->
+                <button onclick="adminLogout()" class="text-xs font-bold px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition flex items-center gap-1" title="Lock & Logout of Owner Portal">
+                    <span>🔒</span>
+                    <span>Lock Portal</span>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-6 flex-1 space-y-6">
+
+        <!-- TOP KPI STATS ROW -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- KPI 1: Revenue -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    <span>Today's Sales</span>
+                    <span class="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">UPI + RFID</span>
+                </div>
+                <div id="kpiRevenue" class="text-2xl sm:text-3xl font-black text-slate-900 font-mono">₹0.00</div>
+                <div class="text-[11px] text-slate-400 font-medium mt-1">Real-time daily collection</div>
+            </div>
+
+            <!-- KPI 2: Total Orders -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    <span>Total Orders</span>
+                    <span class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Today</span>
+                </div>
+                <div id="kpiOrdersToday" class="text-2xl sm:text-3xl font-black text-slate-900 font-mono">0</div>
+                <div class="text-[11px] text-slate-400 font-medium mt-1">Orders processed today</div>
+            </div>
+
+            <!-- KPI 3: Active Prep -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    <span>Active in Kitchen</span>
+                    <span class="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">Live KDS</span>
+                </div>
+                <div id="kpiActiveKitchen" class="text-2xl sm:text-3xl font-black text-amber-600 font-mono">0</div>
+                <div class="text-[11px] text-slate-400 font-medium mt-1">Pending / preparing tickets</div>
+            </div>
+
+            <!-- KPI 4: Low Stock Alerts -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    <span>Low Stock Alerts</span>
+                    <span id="kpiLowStockBadge" class="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md font-bold">0 Alert</span>
+                </div>
+                <div id="kpiLowStockCount" class="text-2xl sm:text-3xl font-black text-rose-600 font-mono">0</div>
+                <div class="text-[11px] text-slate-400 font-medium mt-1">Raw ingredients below threshold</div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD NAVIGATION TABS -->
+        <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+            <button onclick="switchTab('tab-availability')" class="dash-tab active px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 bg-slate-900 text-white shadow-sm" data-tab="tab-availability">
+                <span>⚡ Real-Time Menu Toggle</span>
+            </button>
+            <button onclick="switchTab('tab-inventory')" class="dash-tab px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200" data-tab="tab-inventory">
+                <span>📦 Raw Inventory & Stock Alerts</span>
+                <span id="invAlertPill" class="hidden px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-extrabold">0</span>
+            </button>
+            <button onclick="switchTab('tab-analytics')" class="dash-tab px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200" data-tab="tab-analytics">
+                <span>📊 Sales & Peak Rush Analytics</span>
+            </button>
+            <button onclick="switchTab('tab-notifications')" class="dash-tab px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200" data-tab="tab-notifications">
+                <span>📲 SMS Dispatch Logs</span>
+            </button>
+        </div>
+
+        <!-- TAB CONTENT 1: MENU AVAILABILITY TOGGLES -->
+        <section id="tab-availability" class="tab-pane space-y-4">
+            <div class="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">💡</span>
+                    <div>
+                        <h3 class="text-xs font-bold text-amber-900">One-Tap Stock Toggle Control</h3>
+                        <p class="text-[11px] text-amber-800">Switching a dish to "Sold Out" immediately disables it on all student phone screens in real time without refreshing.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu Grid -->
+            <div id="adminMenuGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Injected via JavaScript -->
+            </div>
+        </section>
+
+        <!-- TAB CONTENT 2: INVENTORY MANAGEMENT & ALERTS -->
+        <section id="tab-inventory" class="tab-pane hidden space-y-5">
+            <!-- Header with Quick Add Button -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-extrabold text-slate-900">Raw Ingredient Inventory (Amul, Paneer, Rice, Spices)</h2>
+                    <p class="text-xs text-slate-500">Automated warning badges when stock reaches minimum threshold</p>
+                </div>
+                <button onclick="openAddIngredientModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+                    <span>+ New Ingredient</span>
+                </button>
+            </div>
+
+            <!-- Low Stock Banner Alert -->
+            <div id="lowStockBanner" class="hidden bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 flex items-start gap-3">
+                <span class="text-2xl">⚠️</span>
+                <div class="flex-1">
+                    <h3 class="text-xs font-extrabold text-rose-900 uppercase tracking-wide">Critical Low-Stock Warnings</h3>
+                    <p id="lowStockSummaryText" class="text-xs text-rose-700 mt-0.5">Several ingredients are below threshold. Reorder now to prevent menu disruptions.</p>
+                </div>
+            </div>
+
+            <!-- Inventory Cards / Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                            <tr>
+                                <th class="p-3.5 pl-5">Ingredient Name</th>
+                                <th class="p-3.5">Current Stock</th>
+                                <th class="p-3.5">Min Threshold</th>
+                                <th class="p-3.5">Stock Status</th>
+                                <th class="p-3.5">Est. Unit Cost</th>
+                                <th class="p-3.5 text-right pr-5">Quick Restock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB CONTENT 3: VISUAL SALES & PEAK RUSH ANALYTICS -->
+        <section id="tab-analytics" class="tab-pane hidden space-y-6">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Chart 1: Hourly Peak Rush Times -->
+                <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-extrabold text-sm text-slate-900">Peak Order Rush Times</h3>
+                            <p class="text-xs text-slate-400">Order traffic volume across canteen operating hours</p>
+                        </div>
+                        <span class="text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-lg">Lunch Surge (12-2 PM)</span>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="rushChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Top Selling Dishes -->
+                <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-extrabold text-sm text-slate-900">Top-Selling Dishes</h3>
+                            <p class="text-xs text-slate-400">Quantity sold today across all Indian categories</p>
+                        </div>
+                        <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">High Margin</span>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="topItemsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 3: Category Breakdown -->
+            <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4 max-w-xl">
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900">Revenue by Category Breakdown (INR)</h3>
+                    <p class="text-xs text-slate-400">Percentage contribution to total daily sales</p>
+                </div>
+                <div class="h-56 flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- TAB CONTENT 4: SMS / NOTIFICATION DISPATCH LOGS -->
+        <section id="tab-notifications" class="tab-pane hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-extrabold text-slate-900">Automated SMS & Alert Dispatch Log</h2>
+                    <p class="text-xs text-slate-500">Live feed of student notifications sent when tickets are marked "Ready"</p>
+                </div>
+                <button onclick="fetchNotificationLogs()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700">
+                    🔄 Refresh Logs
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="divide-y divide-slate-100" id="notificationsList">
+                    <!-- Dynamic logs -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- QUICK RESTOCK MODAL -->
+    <div id="restockModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900" id="restockItemTitle">Restock Ingredient</h3>
+                    <p class="text-xs text-slate-500" id="restockItemSub">Add new inventory stock</p>
+                </div>
+                <button onclick="closeRestockModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-slate-700">Quick Increment</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="setQuickAdd(5)" class="p-2 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+5</button>
+                    <button onclick="setQuickAdd(10)" class="p-2 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+10</button>
+                    <button onclick="setQuickAdd(25)" class="p-2 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+25</button>
+                    <button onclick="setQuickAdd(50)" class="p-2 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+50</button>
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-bold text-slate-600">Add Amount</label>
+                    <input type="number" id="restockAmountInput" value="10" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900">
+                </div>
+            </div>
+
+            <button onclick="submitStockAdjustment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl shadow-lg shadow-emerald-600/25 transition">
+                ✓ Confirm Restock
+            </button>
+        </div>
+    </div>
+
+    <!-- ADD INGREDIENT MODAL -->
+    <div id="addIngredientModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="text-base font-extrabold text-slate-900">Add Raw Ingredient</h3>
+                <button onclick="closeAddIngredientModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs font-bold text-slate-700">
+                <div>
+                    <label class="block mb-1">Ingredient Name</label>
+                    <input type="text" id="newIngName" placeholder="e.g. Malai Paneer, Basmati Rice" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">Starting Stock</label>
+                        <input type="number" id="newIngStock" value="10" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium">
+                    </div>
+                    <div>
+                        <label class="block mb-1">Unit</label>
+                        <input type="text" id="newIngUnit" value="kg" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">Min Threshold</label>
+                        <input type="number" id="newIngThreshold" value="4" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium">
+                    </div>
+                    <div>
+                        <label class="block mb-1">Cost / Unit (₹)</label>
+                        <input type="number" id="newIngCost" value="150" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium">
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="submitNewIngredient()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl shadow-lg transition">
+                + Save Ingredient
+            </button>
+        </div>
+    </div>
+
+    <!-- Admin JS Controller -->
+    <script src="/js/admin.js"></script>
+</body>
+</html>

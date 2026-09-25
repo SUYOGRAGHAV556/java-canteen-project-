@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Canteen | Quick Order & Live Food Preparation Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        },
+                        emerald: {
+                            500: '#10b981',
+                            600: '#059669',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- SockJS and STOMP Client for Real-time WebSockets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <!-- Canvas Confetti for Celebration on Order Ready -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="min-h-full flex flex-col text-slate-800 bg-slate-50 antialiased pb-32">
+
+    <!-- TOP HEADER -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3 shadow-sm">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
+            
+            <!-- Logo & Campus Info -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white text-xl shadow-md shadow-orange-500/20">
+                    🍛
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-tight">Campus Canteen</h1>
+                    <p class="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Counters 1 & 2 Open
+                    </p>
+                </div>
+            </div>
+
+            <!-- Student Balance Pill, Track Button & Secured Staff Links -->
+            <div class="flex items-center gap-2">
+                <!-- Track Order Button -->
+                <button onclick="openTokenLookupModal()" class="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-95" title="Track Live Order Status">
+                    <span>⏱️</span>
+                    <span class="hidden sm:inline">Track Order</span>
+                </button>
+
+                <!-- Digital RFID Wallet Balance Pill -->
+                <button id="walletBtn" onclick="openRechargeModal()" class="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 px-2.5 sm:px-3 py-1.5 rounded-full transition active:scale-95 text-left">
+                    <span class="text-emerald-700 text-sm">💳</span>
+                    <div>
+                        <div class="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-emerald-600 leading-none">RFID Wallet</div>
+                        <div id="walletBalanceDisplay" class="text-xs font-extrabold text-emerald-900 leading-tight">₹850.00</div>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-600 ml-0.5 bg-white w-4 h-4 rounded-full flex items-center justify-center shadow-xs">+</span>
+                </button>
+
+                <!-- Navigation Portal Links with Security Badges -->
+                <a href="/kds.html" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Kitchen Staff Portal (Protected)">
+                    👨‍🍳 <span class="hidden md:inline">Kitchen</span> <span class="text-[10px] text-slate-400">🔒</span>
+                </a>
+                <a href="/admin.html" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Owner / Admin Portal (Protected)">
+                    ⚙️ <span class="hidden md:inline">Owner</span> <span class="text-[10px] text-slate-400">🔒</span>
+                </a>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- FLOATING TOP ACTIVE ORDER BANNER (Visible when order is in preparation) -->
+    <div id="activeOrderBanner" class="hidden bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md border-b border-orange-700/50 px-4 py-2.5 sticky top-[57px] z-20 animate-slide-down">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 overflow-hidden">
+                <span class="w-3 h-3 rounded-full bg-white animate-ping flex-shrink-0"></span>
+                <div class="text-xs truncate">
+                    <span class="font-extrabold" id="bannerTokenText">#ORD-101</span>:
+                    <span class="font-medium text-orange-100" id="bannerStatusText">Chef is preparing your dishes fresh</span>
+                </div>
+            </div>
+            <button onclick="reopenActiveTracker()" class="bg-white text-orange-700 hover:bg-orange-50 px-3 py-1 rounded-xl text-xs font-black flex-shrink-0 shadow-sm flex items-center gap-1 transition active:scale-95">
+                <span id="bannerCountdownBadge">⏳ 05:40</span>
+                <span>Track ➔</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-4xl mx-auto w-full px-4 pt-4 flex-1">
+
+        <!-- STUDENT PROFILE SUMMARY -->
+        <div class="bg-white rounded-2xl p-3 mb-4 border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm">
+                    SR
+                </div>
+                <div>
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                        <span>Suyog Raghav</span>
+                        <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">RFID-9842</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500">+91 98765 43210 • Computer Science Dept</div>
+                </div>
+            </div>
+            <button onclick="openTokenLookupModal()" class="text-xs text-orange-600 hover:text-orange-700 font-bold bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200">
+                🔍 Find Order
+            </button>
+        </div>
+
+        <!-- SEARCH BAR & FILTER ROW -->
+        <div class="mb-4 space-y-3">
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="Search Masala Dosa, Pav Bhaji, Chai, Biryani, Lassi..." 
+                       class="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-slate-200 text-slate-800 placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm text-sm"
+                       oninput="handleSearch(this.value)">
+                <span class="absolute left-4 top-3.5 text-slate-400 text-base">🔍</span>
+                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3.5 top-3 text-xs bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+            </div>
+
+            <!-- Category Pills (Horizontal Scroll on Mobile) -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+                <button onclick="filterCategory('ALL')" class="cat-pill active flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-orange-500 text-white shadow-md shadow-orange-500/25" data-cat="ALL">
+                    🔥 All Dishes
+                </button>
+                <button onclick="filterCategory('BREAKFAST')" class="cat-pill flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50" data-cat="BREAKFAST">
+                    🥘 Breakfast & Dosas
+                </button>
+                <button onclick="filterCategory('SNACKS')" class="cat-pill flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50" data-cat="SNACKS">
+                    🥪 Snacks & Chaat
+                </button>
+                <button onclick="filterCategory('DRINKS')" class="cat-pill flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50" data-cat="DRINKS">
+                    ☕ Chai & Lassi
+                </button>
+                <button onclick="filterCategory('MEALS')" class="cat-pill flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50" data-cat="MEALS">
+                    🍛 Thalis & Meals
+                </button>
+            </div>
+
+            <!-- Quick Dietary Toggle Badges -->
+            <div class="flex items-center justify-between text-xs pt-1">
+                <div class="flex items-center gap-2">
+                    <button id="vegFilterBtn" onclick="toggleVegFilter()" class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold hover:border-emerald-500 transition">
+                        <span class="w-2.5 h-2.5 rounded-sm border border-emerald-600 flex items-center justify-center p-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span></span> Pure Veg Only
+                    </button>
+                    <button id="quickPrepBtn" onclick="toggleQuickPrepFilter()" class="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold hover:border-amber-500 transition">
+                        ⚡ Quick Prep (&lt;8m)
+                    </button>
+                </div>
+                <div id="itemsCountBadge" class="text-slate-500 font-medium">Loading delicious items...</div>
+            </div>
+        </div>
+
+        <!-- MENU ITEMS GRID -->
+        <div id="menuGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Loading Skeleton -->
+            <div class="col-span-full py-16 text-center text-slate-400">
+                <div class="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                <p class="font-medium text-sm">Loading delicious campus canteen menu...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FLOATING STICKY CART BAR (Appears when cart > 0) -->
+    <div id="floatingCartBar" class="fixed bottom-4 left-4 right-4 max-w-lg mx-auto z-40 hidden animate-slide-up">
+        <div class="bg-slate-900/95 backdrop-blur text-white p-3.5 px-4 rounded-2xl shadow-2xl border border-slate-800 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center font-bold text-base shadow-lg shadow-orange-500/30">
+                    <span id="cartCountBadge">0</span>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Total Bill</div>
+                    <div id="cartTotalDisplay" class="text-lg font-extrabold text-white">₹0.00</div>
+                </div>
+            </div>
+
+            <button onclick="openCheckoutModal()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-orange-500/30 transition active:scale-95 flex items-center gap-2">
+                <span>Quick 2-Click Pay</span>
+                <span class="text-base font-bold">➔</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2-CLICK CHECKOUT MODAL -->
+    <div id="checkoutModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 space-y-5 animate-slide-up max-h-[90vh] overflow-y-auto">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h2 class="text-lg font-extrabold text-slate-900">2-Click Instant Checkout</h2>
+                    <p class="text-xs text-slate-500 font-medium">Verify pickup time & tap confirm</p>
+                </div>
+                <button onclick="closeCheckoutModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center text-sm font-bold">✕</button>
+            </div>
+
+            <!-- Order Summary Line Items -->
+            <div class="bg-slate-50 rounded-2xl p-3.5 space-y-2 border border-slate-100">
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Indian Dishes</div>
+                <div id="checkoutItemsList" class="space-y-1.5 max-h-36 overflow-y-auto pr-1 text-sm">
+                    <!-- Line items dynamically injected here -->
+                </div>
+                <div class="border-t border-slate-200 pt-2 flex items-center justify-between text-base font-bold text-slate-900">
+                    <span>Total Payable</span>
+                    <span id="checkoutTotalAmount" class="text-orange-600 font-extrabold">₹0.00</span>
+                </div>
+            </div>
+
+            <!-- STEP 1: PICKUP TIME SELECTOR -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>1. SELECT PICKUP TIME</span>
+                    <span class="text-[10px] text-orange-600 font-semibold">⚡ Skip Canteen Lines</span>
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" onclick="selectPickupOption('ASAP (10-15m)', this)" class="pickup-btn active border-2 border-orange-500 bg-orange-50 text-orange-800 p-2.5 rounded-xl text-center font-bold text-xs transition">
+                        <div class="text-base mb-0.5">⚡</div>
+                        <div>ASAP</div>
+                        <div class="text-[10px] font-normal text-slate-500">~8-12 mins</div>
+                    </button>
+                    <button type="button" onclick="selectPickupOption('In 25 mins', this)" class="pickup-btn border-2 border-slate-200 hover:border-slate-300 p-2.5 rounded-xl text-center font-bold text-xs text-slate-700 transition">
+                        <div class="text-base mb-0.5">⏰</div>
+                        <div>In 25m</div>
+                        <div class="text-[10px] font-normal text-slate-500">Post Lecture</div>
+                    </button>
+                    <button type="button" onclick="selectPickupOption('In 45 mins', this)" class="pickup-btn border-2 border-slate-200 hover:border-slate-300 p-2.5 rounded-xl text-center font-bold text-xs text-slate-700 transition">
+                        <div class="text-base mb-0.5">☕</div>
+                        <div>In 45m</div>
+                        <div class="text-[10px] font-normal text-slate-500">Lunch Break</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: PAYMENT METHOD (RFID CARD vs UPI) -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-slate-700">2. PAYMENT METHOD</label>
+                
+                <div class="space-y-2">
+                    <!-- Option A: Campus RFID Card / Digital Wallet -->
+                    <label class="payment-option border-2 border-emerald-500 bg-emerald-50/70 p-3 rounded-2xl flex items-center justify-between cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="radio" name="paymentMethod" value="WALLET_RFID" checked onchange="handlePaymentChange('WALLET_RFID')" class="accent-emerald-600 w-4 h-4">
+                            <div>
+                                <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span>💳 Campus RFID Card / Wallet</span>
+                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Instant</span>
+                                </div>
+                                <div class="text-[11px] text-slate-600">Suyog Raghav (Tag: <span class="font-mono font-semibold">RFID-9842</span>)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs font-extrabold text-emerald-800" id="checkoutWalletBalance">₹850.00</div>
+                            <div class="text-[10px] text-emerald-600 font-medium">Available</div>
+                        </div>
+                    </label>
+
+                    <!-- Option B: UPI QR -->
+                    <label class="payment-option border-2 border-slate-200 hover:border-slate-300 p-3 rounded-2xl flex items-center justify-between cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="radio" name="paymentMethod" value="UPI_QR" onchange="handlePaymentChange('UPI_QR')" class="accent-orange-500 w-4 h-4">
+                            <div>
+                                <div class="text-xs font-bold text-slate-900">📱 Instant UPI QR Code</div>
+                                <div class="text-[11px] text-slate-500">Google Pay, PhonePe, Paytm (Zero Fee)</div>
+                            </div>
+                        </div>
+                        <div class="text-xs font-bold text-slate-500">UPI ➔</div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Special Instructions Note -->
+            <div>
+                <input type="text" id="specialNotesInput" placeholder="Cooking note (e.g., extra spicy, no onion, less butter)" 
+                       class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-700">
+            </div>
+
+            <!-- Confirm Button -->
+            <button id="confirmOrderBtn" onclick="submitOrder()" class="w-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-xl shadow-orange-500/25 active:scale-98 transition flex items-center justify-center gap-2">
+                <span>🔥 Confirm & Place Order</span>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- LIVE ORDER PREPARATION & STATUS TRACKER MODAL -->
+    <div id="trackerModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-5 animate-slide-up text-center relative overflow-hidden max-h-[95vh] overflow-y-auto">
+            
+            <!-- Confetti trigger anchor -->
+            <div id="confettiAnchor" class="absolute top-0 left-1/2 -translate-x-1/2"></div>
+
+            <!-- Header -->
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span> Live Kitchen Preparation Tracker
+                </span>
+                <button onclick="closeTrackerModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center font-bold text-xs">✕</button>
+            </div>
+
+            <!-- Token Display & Customer Name -->
+            <div class="bg-gradient-to-b from-orange-50 to-amber-50/60 border-2 border-orange-200 rounded-3xl p-4 space-y-1">
+                <div class="text-[11px] font-bold text-orange-700 uppercase tracking-widest">Your Pickup Token</div>
+                <div id="trackerTokenNumber" class="text-4xl font-black text-slate-900 font-mono tracking-tight">#ORD-101</div>
+                <div id="trackerCustomerName" class="text-xs text-slate-600 font-medium">Order for Suyog Raghav</div>
+            </div>
+
+            <!-- LIVE PREPARATION TIME & DYNAMIC PROGRESS ENGINE -->
+            <div class="bg-slate-900 text-white rounded-3xl p-4 space-y-3 text-left shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⏱️</span>
+                        <div>
+                            <div class="text-[10px] uppercase font-bold tracking-wider text-orange-400 leading-none">Est. Prep Countdown</div>
+                            <div id="trackerCountdownTimer" class="text-2xl font-black font-mono text-white leading-tight">07:30</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="trackerEstPickupClock" class="text-xs font-bold text-amber-300 font-mono">Pickup ~ 18:15</div>
+                        <div class="text-[10px] text-slate-400 font-medium">Fresh on Griddle</div>
+                    </div>
+                </div>
+
+                <!-- Animated Progress Bar -->
+                <div class="space-y-1">
+                    <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                        <div id="trackerProgressBar" class="bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: 45%;"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono font-semibold">
+                        <span id="trackerCookingStatus">👨‍🍳 Cooking in Progress</span>
+                        <span id="trackerProgressPercent">45% Completed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-Time Progress Steps -->
+            <div class="space-y-3 text-left px-1">
+                <!-- Step 1: Received -->
+                <div id="step-NEW" class="flex items-center gap-3 p-2 rounded-xl transition">
+                    <div class="step-icon w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shadow-md">✓</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900">1. Order Received</div>
+                        <div class="text-[11px] text-slate-500">Ticket queued at Kitchen Display System</div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Preparing -->
+                <div id="step-PREPARING" class="flex items-center gap-3 p-2 rounded-xl transition opacity-40">
+                    <div class="step-icon w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">🍳</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900">2. Preparing in Kitchen</div>
+                        <div class="text-[11px] text-slate-500">Chef is cooking dishes with fresh ingredients</div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Ready for Pickup -->
+                <div id="step-READY" class="flex items-center gap-3 p-2 rounded-xl transition opacity-40">
+                    <div class="step-icon w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">🔔</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900">3. Ready for Counter Pickup</div>
+                        <div class="text-[11px] text-slate-500">Pick up at Counter 2 (Hot Plating Tray)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items List inside Tracker -->
+            <div class="bg-slate-50 rounded-2xl p-3 text-left border border-slate-100">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dishes in this Ticket</div>
+                <div id="trackerItemsList" class="space-y-1 text-xs text-slate-700">
+                    <!-- Dynamic list items -->
+                </div>
+            </div>
+
+            <!-- Simulated SMS Alert Toast inside Tracker -->
+            <div id="smsNotificationBanner" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl text-left text-xs space-y-1 animate-pulse">
+                <div class="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <span>📲 SMS Sent to <span id="smsRecipientPhone">+91 98765 43210</span></span>
+                </div>
+                <p class="text-[11px] text-emerald-700">"🔔 Canteen Alert: Your Order is freshly prepared and READY for pickup at Counter 2! Please present your Token."</p>
+            </div>
+
+            <button onclick="closeTrackerModal()" class="w-full bg-slate-900 text-white font-bold text-sm py-3 rounded-2xl hover:bg-slate-800 transition">
+                Back to Canteen Menu
+            </button>
+        </div>
+    </div>
+
+    <!-- QUICK TOKEN LOOKUP MODAL -->
+    <div id="tokenSearchModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900">Track Order by Token</h3>
+                    <p class="text-xs text-slate-500">Enter your Token number (e.g. ORD-101)</p>
+                </div>
+                <button onclick="closeTokenLookupModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <div>
+                <input type="text" id="tokenSearchInput" placeholder="e.g. ORD-101" 
+                       class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-mono font-bold text-slate-900 uppercase focus:ring-2 focus:ring-orange-500 focus:outline-none">
+            </div>
+
+            <button onclick="lookupOrderByToken()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-2xl shadow-lg shadow-orange-500/25 transition flex items-center justify-center gap-2">
+                <span>🔍 Track Preparation Time</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- WALLET RECHARGE MODAL -->
+    <div id="rechargeModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900">Top-Up RFID Wallet</h3>
+                    <p class="text-xs text-slate-500">Instant UPI balance recharge</p>
+                </div>
+                <button onclick="closeRechargeModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="setRechargeVal(100)" class="p-2.5 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+₹100</button>
+                <button onclick="setRechargeVal(250)" class="p-2.5 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+₹250</button>
+                <button onclick="setRechargeVal(500)" class="p-2.5 rounded-xl border border-slate-200 font-bold text-xs hover:border-emerald-500 hover:bg-emerald-50">+₹500</button>
+            </div>
+
+            <div>
+                <label class="text-[11px] font-bold text-slate-600">Custom Amount (₹)</label>
+                <input type="number" id="customRechargeAmount" value="200" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800">
+            </div>
+
+            <button onclick="executeWalletRecharge()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl shadow-lg shadow-emerald-600/25 transition">
+                ⚡ Recharge Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Student JavaScript Controller -->
+    <script src="/js/student.js"></script>
+</body>
+</html>

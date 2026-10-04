@@ -22,6 +22,10 @@ const state = {
     activeOrder: null, // Holds currently tracked order object
     activeTrackingOrderNumber: null,
     trackerTimerInterval: null,
+    qrScanStream: null,
+    qrScanFrame: null,
+    paymentQrScanStream: null,
+    paymentQrScanFrame: null,
     stompClient: null
 };
 
@@ -300,6 +304,13 @@ function openCheckoutModal() {
     const { totalItems, totalPrice } = getCartCalculations();
     if (totalItems === 0) return;
 
+    renderCheckoutItems();
+    updateWalletDisplay();
+
+    document.getElementById('checkoutModal').classList.remove('hidden');
+}
+
+function renderCheckoutItems() {
     const listEl = document.getElementById('checkoutItemsList');
     listEl.innerHTML = Object.entries(state.cart).map(([idStr, qty]) => {
         const item = state.menuItems.find(i => i.id === Number(idStr));
@@ -308,7 +319,11 @@ function openCheckoutModal() {
         return `
             <div class="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
                 <div class="flex items-center gap-2">
-                    <span class="w-5 h-5 rounded-md bg-orange-100 text-orange-800 text-[11px] font-bold flex items-center justify-center">${qty}x</span>
+                    <div class="flex items-center bg-white border border-slate-200 rounded-lg">
+                        <button type="button" onclick="changeCheckoutQuantity(${item.id}, -1)" aria-label="Remove one ${item.name}" class="w-7 h-7 text-slate-600 hover:bg-slate-100 rounded-l-lg font-bold">−</button>
+                        <span class="w-6 text-center text-[11px] font-bold text-slate-800">${qty}</span>
+                        <button type="button" onclick="changeCheckoutQuantity(${item.id}, 1)" aria-label="Add one ${item.name}" class="w-7 h-7 text-slate-600 hover:bg-slate-100 rounded-r-lg font-bold">+</button>
+                    </div>
                     <span class="text-xs font-semibold text-slate-800">${item.name}</span>
                 </div>
                 <span class="text-xs font-bold text-slate-900">₹${sub.toFixed(2)}</span>
@@ -316,13 +331,28 @@ function openCheckoutModal() {
         `;
     }).join('');
 
+    const { totalItems, totalPrice } = getCartCalculations();
+    listEl.setAttribute('aria-label', `${totalItems} items in order`);
     document.getElementById('checkoutTotalAmount').textContent = `₹${totalPrice.toFixed(2)}`;
-    updateWalletDisplay();
+}
 
-    document.getElementById('checkoutModal').classList.remove('hidden');
+function changeCheckoutQuantity(itemId, delta) {
+    if (delta > 0) {
+        addToCart(itemId);
+    } else {
+        removeFromCart(itemId);
+    }
+
+    const { totalItems } = getCartCalculations();
+    if (totalItems === 0) {
+        closeCheckoutModal();
+        return;
+    }
+    renderCheckoutItems();
 }
 
 function closeCheckoutModal() {
+    stopPaymentQrScanner();
     document.getElementById('checkoutModal').classList.add('hidden');
 }
 
@@ -338,6 +368,107 @@ function selectPickupOption(option, btnElement) {
 
 function handlePaymentChange(method) {
     state.selectedPaymentMethod = method;
+    const scanner = document.getElementById('paymentQrScanner');
+    scanner.classList.toggle('hidden', method !== 'UPI_QR');
+    if (method !== 'UPI_QR') stopPaymentQrScanner();
+}
+
+async function startPaymentQrScanner() {
+    const video = document.getElementById('paymentQrVideo');
+    const status = document.getElementById('paymentQrStatus');
+    const stopButton = document.getElementById('stopPaymentQrScannerBtn');
+    const fallbackLink = document.getElementById('paymentQrFallbackLink');
+    fallbackLink.classList.add('hidden');
+
+    if (!('BarcodeDetector' in window)) {
+        status.textContent = 'QR scanning is not supported in this browser. Open this checkout on a camera-capable mobile browser.';
+        return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = 'Camera access requires a secure connection. Use HTTPS or localhost.';
+        return;
+    }
+
+    stopPaymentQrScanner();
+    status.textContent = 'Requesting camera access...';
+    try {
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        state.paymentQrScanStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false
+        });
+        video.srcObject = state.paymentQrScanStream;
+        video.classList.remove('hidden');
+        stopButton.classList.remove('hidden');
+        await video.play();
+        status.textContent = 'Point the camera at the canteen UPI QR code.';
+
+        const scanFrame = async () => {
+            if (!state.paymentQrScanStream) return;
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                try {
+                    const codes = await detector.detect(video);
+                    if (codes.length) {
+                        const paymentUri = createUpiPaymentUri(codes[0].rawValue);
+                        if (!paymentUri) {
+                            status.textContent = 'This QR is not a valid UPI payment QR. Scan the canteen payment QR.';
+                        } else {
+                            stopPaymentQrScanner();
+                            status.textContent = 'Opening your UPI payment app...';
+                            fallbackLink.href = paymentUri;
+                            fallbackLink.classList.remove('hidden');
+                            window.location.href = paymentUri;
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not read payment QR code:', err);
+                }
+            }
+            state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
+        };
+        state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
+    } catch (err) {
+        stopPaymentQrScanner();
+        status.textContent = err.name === 'NotAllowedError'
+            ? 'Camera permission was denied. Allow camera access and try again.'
+            : 'Could not start the camera. Check camera access and try again.';
+    }
+}
+
+function createUpiPaymentUri(qrValue) {
+    try {
+        const paymentUri = new URL(qrValue.trim());
+        if (paymentUri.protocol !== 'upi:' || paymentUri.hostname.toLowerCase() !== 'pay') return null;
+        if (!paymentUri.searchParams.get('pa')) return null;
+
+        const { totalPrice } = getCartCalculations();
+        if (totalPrice <= 0) return null;
+        paymentUri.searchParams.set('am', totalPrice.toFixed(2));
+        paymentUri.searchParams.set('cu', 'INR');
+        return paymentUri.toString();
+    } catch (err) {
+        return null;
+    }
+}
+
+function stopPaymentQrScanner() {
+    if (state.paymentQrScanFrame) {
+        cancelAnimationFrame(state.paymentQrScanFrame);
+        state.paymentQrScanFrame = null;
+    }
+    if (state.paymentQrScanStream) {
+        state.paymentQrScanStream.getTracks().forEach(track => track.stop());
+        state.paymentQrScanStream = null;
+    }
+    const video = document.getElementById('paymentQrVideo');
+    const stopButton = document.getElementById('stopPaymentQrScannerBtn');
+    if (video) {
+        video.pause();
+        video.srcObject = null;
+        video.classList.add('hidden');
+    }
+    if (stopButton) stopButton.classList.add('hidden');
 }
 
 // ------------------------------------------------------------------------------
@@ -605,7 +736,76 @@ function openTokenLookupModal() {
 }
 
 function closeTokenLookupModal() {
+    stopOrderQrScanner();
     document.getElementById('tokenSearchModal').classList.add('hidden');
+}
+
+async function startOrderQrScanner() {
+    const panel = document.getElementById('orderQrScanner');
+    const status = document.getElementById('orderQrStatus');
+    const video = document.getElementById('orderQrVideo');
+    panel.classList.remove('hidden');
+
+    if (!('BarcodeDetector' in window)) {
+        status.textContent = 'QR scanning is not supported in this browser. Enter the order token above instead.';
+        return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = 'Camera access requires a secure connection. Enter the order token above instead.';
+        return;
+    }
+
+    try {
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        state.qrScanStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false
+        });
+        video.srcObject = state.qrScanStream;
+        await video.play();
+        status.textContent = 'Camera ready. Point it at an order QR code.';
+
+        const scanFrame = async () => {
+            if (!state.qrScanStream) return;
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                try {
+                    const codes = await detector.detect(video);
+                    if (codes.length) {
+                        const token = codes[0].rawValue.toUpperCase().match(/ORD-[A-Z0-9-]+/);
+                        if (token) {
+                            document.getElementById('tokenSearchInput').value = token[0];
+                            stopOrderQrScanner();
+                            await fetchOrderByNumber(token[0], true);
+                            return;
+                        }
+                        status.textContent = 'No order token found in this QR. Try an order QR or enter the token manually.';
+                    }
+                } catch (err) {
+                    console.warn('Could not read QR code:', err);
+                }
+            }
+            state.qrScanFrame = requestAnimationFrame(scanFrame);
+        };
+        state.qrScanFrame = requestAnimationFrame(scanFrame);
+    } catch (err) {
+        stopOrderQrScanner();
+        status.textContent = err.name === 'NotAllowedError'
+            ? 'Camera permission was denied. Enter the order token above instead.'
+            : 'Could not start the camera. Enter the order token above instead.';
+    }
+}
+
+function stopOrderQrScanner() {
+    if (state.qrScanFrame) {
+        cancelAnimationFrame(state.qrScanFrame);
+        state.qrScanFrame = null;
+    }
+    if (state.qrScanStream) {
+        state.qrScanStream.getTracks().forEach(track => track.stop());
+        state.qrScanStream = null;
+    }
+    const video = document.getElementById('orderQrVideo');
+    if (video) video.srcObject = null;
 }
 
 async function lookupOrderByToken() {

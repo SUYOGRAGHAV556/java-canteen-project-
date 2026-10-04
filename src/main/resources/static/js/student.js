@@ -26,6 +26,7 @@ const state = {
     qrScanFrame: null,
     paymentQrScanStream: null,
     paymentQrScanFrame: null,
+    paymentQrReaderControls: null,
     stompClient: null
 };
 
@@ -370,7 +371,11 @@ function handlePaymentChange(method) {
     state.selectedPaymentMethod = method;
     const scanner = document.getElementById('paymentQrScanner');
     scanner.classList.toggle('hidden', method !== 'UPI_QR');
-    if (method !== 'UPI_QR') stopPaymentQrScanner();
+    if (method === 'UPI_QR') {
+        startPaymentQrScanner();
+    } else {
+        stopPaymentQrScanner();
+    }
 }
 
 async function startPaymentQrScanner() {
@@ -380,7 +385,9 @@ async function startPaymentQrScanner() {
     const fallbackLink = document.getElementById('paymentQrFallbackLink');
     fallbackLink.classList.add('hidden');
 
-    if (!('BarcodeDetector' in window)) {
+    const hasNativeScanner = 'BarcodeDetector' in window;
+    const hasQrFallback = Boolean(window.ZXingBrowser && window.ZXingBrowser.BrowserQRCodeReader);
+    if (!hasNativeScanner && !hasQrFallback) {
         status.textContent = 'QR scanning is not supported in this browser. Open this checkout on a camera-capable mobile browser.';
         return;
     }
@@ -392,48 +399,62 @@ async function startPaymentQrScanner() {
     stopPaymentQrScanner();
     status.textContent = 'Requesting camera access...';
     try {
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        state.paymentQrScanStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false
-        });
-        video.srcObject = state.paymentQrScanStream;
         video.classList.remove('hidden');
         stopButton.classList.remove('hidden');
-        await video.play();
         status.textContent = 'Point the camera at the canteen UPI QR code.';
 
-        const scanFrame = async () => {
-            if (!state.paymentQrScanStream) return;
-            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-                try {
-                    const codes = await detector.detect(video);
-                    if (codes.length) {
-                        const paymentUri = createUpiPaymentUri(codes[0].rawValue);
-                        if (!paymentUri) {
-                            status.textContent = 'This QR is not a valid UPI payment QR. Scan the canteen payment QR.';
-                        } else {
-                            stopPaymentQrScanner();
-                            status.textContent = 'Opening your UPI payment app...';
-                            fallbackLink.href = paymentUri;
-                            fallbackLink.classList.remove('hidden');
-                            window.location.href = paymentUri;
-                            return;
-                        }
+        if (hasNativeScanner) {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            state.paymentQrScanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' } },
+                audio: false
+            });
+            video.srcObject = state.paymentQrScanStream;
+            await video.play();
+
+            const scanFrame = async () => {
+                if (!state.paymentQrScanStream) return;
+                if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                    try {
+                        const codes = await detector.detect(video);
+                        if (codes.length && handlePaymentQrResult(codes[0].rawValue)) return;
+                    } catch (err) {
+                        console.warn('Could not read payment QR code:', err);
                     }
-                } catch (err) {
-                    console.warn('Could not read payment QR code:', err);
                 }
-            }
+                state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
+            };
             state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
-        };
-        state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
+        } else {
+            const reader = new ZXingBrowser.BrowserQRCodeReader();
+            state.paymentQrReaderControls = await reader.decodeFromVideoDevice(undefined, video, result => {
+                if (result) handlePaymentQrResult(result.getText());
+            });
+        }
     } catch (err) {
         stopPaymentQrScanner();
         status.textContent = err.name === 'NotAllowedError'
             ? 'Camera permission was denied. Allow camera access and try again.'
             : 'Could not start the camera. Check camera access and try again.';
     }
+}
+
+function handlePaymentQrResult(qrValue) {
+    const status = document.getElementById('paymentQrStatus');
+    const fallbackLink = document.getElementById('paymentQrFallbackLink');
+    const paymentUri = createUpiPaymentUri(qrValue);
+
+    if (!paymentUri) {
+        status.textContent = 'This QR is not a valid UPI payment QR. Scan the canteen payment QR.';
+        return false;
+    }
+
+    stopPaymentQrScanner();
+    status.textContent = 'QR scanned. Tap below to choose an installed UPI payment app.';
+    fallbackLink.href = paymentUri;
+    fallbackLink.textContent = 'Choose UPI app and pay';
+    fallbackLink.classList.remove('hidden');
+    return true;
 }
 
 function createUpiPaymentUri(qrValue) {
@@ -460,6 +481,10 @@ function stopPaymentQrScanner() {
     if (state.paymentQrScanStream) {
         state.paymentQrScanStream.getTracks().forEach(track => track.stop());
         state.paymentQrScanStream = null;
+    }
+    if (state.paymentQrReaderControls) {
+        state.paymentQrReaderControls.stop();
+        state.paymentQrReaderControls = null;
     }
     const video = document.getElementById('paymentQrVideo');
     const stopButton = document.getElementById('stopPaymentQrScannerBtn');

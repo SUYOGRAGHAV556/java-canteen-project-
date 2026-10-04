@@ -312,7 +312,7 @@
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                     <h2 id="upiPaymentTitle" class="text-lg font-extrabold text-slate-900">Pay with UPI</h2>
-                    <p class="text-xs text-slate-500">Scan with any UPI payment app</p>
+                    <p class="text-xs text-slate-500">Paying to suyograghav361@okhdfcbank</p>
                 </div>
                 <button type="button" onclick="closePaymentQrModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center font-bold" aria-label="Close payment QR">✕</button>
             </div>
@@ -330,17 +330,6 @@
                 <div id="upiQrCode" class="upi-qr-code" aria-label="UPI payment QR code"></div>
             </div>
 
-            <div class="space-y-2">
-                <div class="text-[10px] text-center uppercase tracking-wider font-bold text-slate-500">Or open a payment app</div>
-                <div class="upi-app-grid">
-                    <button type="button" class="upi-app-button" onclick="launchUpiApp('gpay')"><span class="upi-app-mark gpay-mark">G</span><span>Google Pay</span></button>
-                    <button type="button" class="upi-app-button" onclick="launchUpiApp('phonepe')"><span class="upi-app-mark phonepe-mark">P</span><span>PhonePe</span></button>
-                    <button type="button" class="upi-app-button" onclick="launchUpiApp('paytm')"><span class="upi-app-mark paytm-mark">Pay</span><span>Paytm</span></button>
-                    <button type="button" class="upi-app-button" onclick="launchUpiApp('bhim')"><span class="upi-app-mark bhim-mark">B</span><span>BHIM</span></button>
-                    <button type="button" class="upi-app-button upi-app-any" onclick="launchUpiApp('any')"><span class="upi-app-mark any-upi-mark">UPI</span><span>Pay via Any UPI App</span></button>
-                </div>
-            </div>
-
             <div id="upiQrCountdown" class="text-center font-mono text-sm font-bold text-orange-700">QR expires in 05:00</div>
             <p id="upiPaymentStatus" class="text-center text-xs text-slate-500" role="status" aria-live="polite">Scan this code using your UPI app to pay.</p>
 
@@ -348,18 +337,6 @@
                 Verify Payment
             </button>
             <button type="button" onclick="closePaymentQrModal()" class="w-full text-sm font-semibold text-slate-600 hover:text-slate-900 py-1">Back to checkout</button>
-        </div>
-    </div>
-
-    <!-- MOBILE UPI INTENT PROMPT -->
-    <div id="upiIntentPromptModal" class="fixed inset-0 z-[70] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="upiIntentPromptTitle">
-        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-4 text-center animate-slide-up">
-            <div id="upiIntentSpinner" class="upi-intent-spinner mx-auto" aria-hidden="true"></div>
-            <h2 id="upiIntentPromptTitle" class="text-lg font-extrabold text-slate-900">Opening payment app...</h2>
-            <p class="text-sm text-slate-600">Complete the transaction on your phone.</p>
-            <p id="upiIntentWaitStatus" class="text-xs font-semibold text-orange-700" role="status" aria-live="polite">Waiting for confirmation... 02:00</p>
-            <button id="upiIntentPaidBtn" type="button" onclick="confirmUpiIntentPayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">I Have Paid</button>
-            <button type="button" onclick="closeUpiIntentPrompt()" class="w-full text-sm font-semibold text-slate-600 hover:text-slate-900 py-1">Return to QR code</button>
         </div>
     </div>
 

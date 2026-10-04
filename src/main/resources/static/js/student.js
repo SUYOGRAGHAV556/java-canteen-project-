@@ -22,11 +22,11 @@ const state = {
     activeOrder: null, // Holds currently tracked order object
     activeTrackingOrderNumber: null,
     trackerTimerInterval: null,
-    qrScanStream: null,
-    qrScanFrame: null,
-    paymentQrScanStream: null,
-    paymentQrScanFrame: null,
-    paymentQrReaderControls: null,
+    paymentQrTimerInterval: null,
+    paymentQrSecondsRemaining: 300,
+    upiIntentTimerInterval: null,
+    upiIntentSecondsRemaining: 120,
+    upiPaymentVerified: false,
     stompClient: null
 };
 
@@ -254,6 +254,7 @@ function addToCart(itemId) {
     if (!item || !item.available) return;
 
     state.cart[itemId] = (state.cart[itemId] || 0) + 1;
+    resetUpiPaymentVerification();
     updateCartUI();
     renderMenuItems();
 }
@@ -265,6 +266,7 @@ function removeFromCart(itemId) {
             delete state.cart[itemId];
         }
     }
+    resetUpiPaymentVerification();
     updateCartUI();
     renderMenuItems();
 }
@@ -353,7 +355,7 @@ function changeCheckoutQuantity(itemId, delta) {
 }
 
 function closeCheckoutModal() {
-    stopPaymentQrScanner();
+    closePaymentQrModal();
     document.getElementById('checkoutModal').classList.add('hidden');
 }
 
@@ -369,131 +371,248 @@ function selectPickupOption(option, btnElement) {
 
 function handlePaymentChange(method) {
     state.selectedPaymentMethod = method;
-    const scanner = document.getElementById('paymentQrScanner');
-    scanner.classList.toggle('hidden', method !== 'UPI_QR');
-    if (method === 'UPI_QR') {
-        startPaymentQrScanner();
-    } else {
-        stopPaymentQrScanner();
-    }
+    document.getElementById('upiPaymentAction').classList.toggle('hidden', method !== 'UPI_QR');
+    resetUpiPaymentVerification();
 }
 
-async function startPaymentQrScanner() {
-    const video = document.getElementById('paymentQrVideo');
-    const status = document.getElementById('paymentQrStatus');
-    const stopButton = document.getElementById('stopPaymentQrScannerBtn');
-    const fallbackLink = document.getElementById('paymentQrFallbackLink');
-    fallbackLink.classList.add('hidden');
+function openPaymentQrModal() {
+    if (state.selectedPaymentMethod !== 'UPI_QR') return;
+    const { totalItems, totalPrice } = getCartCalculations();
+    if (totalItems === 0) return;
 
-    const hasNativeScanner = 'BarcodeDetector' in window;
-    const hasQrFallback = Boolean(window.ZXingBrowser && window.ZXingBrowser.BrowserQRCodeReader);
-    if (!hasNativeScanner && !hasQrFallback) {
-        status.textContent = 'QR scanning is not supported in this browser. Open this checkout on a camera-capable mobile browser.';
+    const qrContainer = document.getElementById('upiQrCode');
+    qrContainer.replaceChildren();
+    clearInterval(state.paymentQrTimerInterval);
+    state.paymentQrTimerInterval = null;
+    document.getElementById('paymentQrOrderItems').innerHTML = Object.entries(state.cart).map(([idStr, quantity]) => {
+        const item = state.menuItems.find(menuItem => menuItem.id === Number(idStr));
+        return item ? `<div class="flex justify-between gap-3"><span>${quantity}x ${item.name}</span><span>₹${(item.price * quantity).toFixed(2)}</span></div>` : '';
+    }).join('');
+    document.getElementById('paymentQrTotal').textContent = `₹${totalPrice.toFixed(2)}`;
+    const status = document.getElementById('upiPaymentStatus');
+    status.textContent = 'Scan this code using your UPI app to pay.';
+    status.classList.remove('text-emerald-700');
+    status.classList.add('text-slate-500');
+    const countdown = document.getElementById('upiQrCountdown');
+    countdown.classList.remove('text-emerald-700');
+    countdown.classList.add('text-orange-700');
+    const verifyButton = document.getElementById('verifyUpiPaymentBtn');
+    verifyButton.disabled = false;
+    verifyButton.textContent = 'Verify Payment';
+    state.upiPaymentVerified = false;
+
+    document.getElementById('upiPaymentModal').classList.remove('hidden');
+    if (typeof QRCode !== 'function') {
+        document.getElementById('upiPaymentStatus').textContent = 'QR generator could not load. Check your internet connection and try again.';
+        qrContainer.textContent = 'QR unavailable';
+        verifyButton.disabled = true;
         return;
     }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        status.textContent = 'Camera access requires a secure connection. Use HTTPS or localhost.';
+
+    const upiParams = new URLSearchParams({
+        pa: 'yourname@upi',
+        pn: 'SmartCanteen',
+        am: totalPrice.toFixed(2),
+        cu: 'INR'
+    });
+    new QRCode(qrContainer, {
+        text: `upi://pay?${upiParams.toString()}`,
+        width: 220,
+        height: 220,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+    setUpiAppButtonsDisabled(false);
+    startPaymentQrCountdown();
+}
+
+function launchUpiApp(app) {
+    if (state.upiPaymentVerified || state.paymentQrSecondsRemaining <= 0) return;
+
+    if (!isMobileDevice()) {
+        document.getElementById('upiPaymentStatus').textContent = 'Desktop detected. Scan the QR code above with your phone to pay.';
         return;
     }
 
-    stopPaymentQrScanner();
-    status.textContent = 'Requesting camera access...';
-    try {
-        video.classList.remove('hidden');
-        stopButton.classList.remove('hidden');
-        status.textContent = 'Point the camera at the canteen UPI QR code.';
+    const { totalItems } = getCartCalculations();
+    if (totalItems === 0) return;
 
-        if (hasNativeScanner) {
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-            state.paymentQrScanStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' } },
-                audio: false
-            });
-            video.srcObject = state.paymentQrScanStream;
-            await video.play();
+    const upiParams = new URLSearchParams({
+        pa: 'yourname@upi',
+        pn: 'SmartCanteen',
+        am: getCartCalculations().totalPrice.toFixed(2),
+        cu: 'INR'
+    });
+    const query = upiParams.toString();
+    const deepLinks = {
+        gpay: `tez://upi/pay?${query}`,
+        phonepe: `phonepe://pay?${query}`,
+        paytm: `paytmmp://pay?${query}`,
+        bhim: `upi://pay?${query}`,
+        any: `upi://pay?${query}`
+    };
+    const appNames = {
+        gpay: 'Google Pay',
+        phonepe: 'PhonePe',
+        paytm: 'Paytm',
+        bhim: 'BHIM',
+        any: 'your UPI app'
+    };
 
-            const scanFrame = async () => {
-                if (!state.paymentQrScanStream) return;
-                if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-                    try {
-                        const codes = await detector.detect(video);
-                        if (codes.length && handlePaymentQrResult(codes[0].rawValue)) return;
-                    } catch (err) {
-                        console.warn('Could not read payment QR code:', err);
-                    }
-                }
-                state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
-            };
-            state.paymentQrScanFrame = requestAnimationFrame(scanFrame);
-        } else {
-            const reader = new ZXingBrowser.BrowserQRCodeReader();
-            state.paymentQrReaderControls = await reader.decodeFromVideoDevice(undefined, video, result => {
-                if (result) handlePaymentQrResult(result.getText());
-            });
+    openUpiIntentPrompt(appNames[app] || 'your UPI app');
+    window.location.href = deepLinks[app] || deepLinks.any;
+}
+
+function isMobileDevice() {
+    return navigator.userAgentData?.mobile === true || /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function openUpiIntentPrompt(appName) {
+    const modal = document.getElementById('upiIntentPromptModal');
+    const title = document.getElementById('upiIntentPromptTitle');
+    const status = document.getElementById('upiIntentWaitStatus');
+    const paidButton = document.getElementById('upiIntentPaidBtn');
+    const spinner = document.getElementById('upiIntentSpinner');
+
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentSecondsRemaining = 120;
+    title.textContent = `Opening ${appName}...`;
+    status.textContent = 'Waiting for confirmation... 02:00';
+    paidButton.disabled = false;
+    paidButton.textContent = 'I Have Paid';
+    spinner.classList.remove('is-complete');
+    modal.classList.remove('hidden');
+    updateUpiIntentCountdown();
+    state.upiIntentTimerInterval = setInterval(() => {
+        state.upiIntentSecondsRemaining = Math.max(0, state.upiIntentSecondsRemaining - 1);
+        updateUpiIntentCountdown();
+    }, 1000);
+}
+
+function updateUpiIntentCountdown() {
+    if (state.upiPaymentVerified) return;
+    const minutes = Math.floor(state.upiIntentSecondsRemaining / 60);
+    const seconds = state.upiIntentSecondsRemaining % 60;
+    const status = document.getElementById('upiIntentWaitStatus');
+    if (state.upiIntentSecondsRemaining === 0) {
+        clearInterval(state.upiIntentTimerInterval);
+        state.upiIntentTimerInterval = null;
+        status.textContent = 'Still waiting. Payment confirmation is simulated in this demo.';
+        return;
+    }
+    status.textContent = `Waiting for confirmation... ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function confirmUpiIntentPayment() {
+    markUpiPaymentVerified();
+    document.getElementById('upiIntentWaitStatus').textContent = 'Payment marked as paid (simulation). Return to checkout to place your order.';
+    document.getElementById('upiIntentPaidBtn').textContent = 'Paid (Simulated)';
+    document.getElementById('upiIntentPaidBtn').disabled = true;
+    document.getElementById('upiIntentSpinner').classList.add('is-complete');
+}
+
+function closeUpiIntentPrompt() {
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
+    document.getElementById('upiIntentPromptModal').classList.add('hidden');
+}
+
+function setUpiAppButtonsDisabled(disabled) {
+    document.querySelectorAll('.upi-app-button').forEach(button => {
+        button.disabled = disabled;
+    });
+}
+
+function startPaymentQrCountdown() {
+    clearInterval(state.paymentQrTimerInterval);
+    state.paymentQrSecondsRemaining = 300;
+    updatePaymentQrCountdown();
+    state.paymentQrTimerInterval = setInterval(() => {
+        state.paymentQrSecondsRemaining -= 1;
+        updatePaymentQrCountdown();
+        if (state.paymentQrSecondsRemaining <= 0) {
+            clearInterval(state.paymentQrTimerInterval);
+            state.paymentQrTimerInterval = null;
+            document.getElementById('upiPaymentStatus').textContent = 'This QR expired. Close and generate a new one.';
+            document.getElementById('verifyUpiPaymentBtn').disabled = true;
+            setUpiAppButtonsDisabled(true);
         }
-    } catch (err) {
-        stopPaymentQrScanner();
-        status.textContent = err.name === 'NotAllowedError'
-            ? 'Camera permission was denied. Allow camera access and try again.'
-            : 'Could not start the camera. Check camera access and try again.';
-    }
+    }, 1000);
 }
 
-function handlePaymentQrResult(qrValue) {
-    const status = document.getElementById('paymentQrStatus');
-    const fallbackLink = document.getElementById('paymentQrFallbackLink');
-    const paymentUri = createUpiPaymentUri(qrValue);
-
-    if (!paymentUri) {
-        status.textContent = 'This QR is not a valid UPI payment QR. Scan the canteen payment QR.';
-        return false;
-    }
-
-    stopPaymentQrScanner();
-    status.textContent = 'QR scanned. Tap below to choose an installed UPI payment app.';
-    fallbackLink.href = paymentUri;
-    fallbackLink.textContent = 'Choose UPI app and pay';
-    fallbackLink.classList.remove('hidden');
-    return true;
+function updatePaymentQrCountdown() {
+    const minutes = Math.floor(state.paymentQrSecondsRemaining / 60);
+    const seconds = state.paymentQrSecondsRemaining % 60;
+    document.getElementById('upiQrCountdown').textContent = `QR expires in ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-function createUpiPaymentUri(qrValue) {
-    try {
-        const paymentUri = new URL(qrValue.trim());
-        if (paymentUri.protocol !== 'upi:' || paymentUri.hostname.toLowerCase() !== 'pay') return null;
-        if (!paymentUri.searchParams.get('pa')) return null;
+async function verifyUpiPayment() {
+    if (state.paymentQrSecondsRemaining <= 0 || state.upiPaymentVerified) return;
 
-        const { totalPrice } = getCartCalculations();
-        if (totalPrice <= 0) return null;
-        paymentUri.searchParams.set('am', totalPrice.toFixed(2));
-        paymentUri.searchParams.set('cu', 'INR');
-        return paymentUri.toString();
-    } catch (err) {
-        return null;
+    const verifyButton = document.getElementById('verifyUpiPaymentBtn');
+    const status = document.getElementById('upiPaymentStatus');
+    verifyButton.disabled = true;
+    verifyButton.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin align-middle mr-2"></span>Verifying...';
+    status.textContent = 'Checking payment...';
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    if (state.paymentQrSecondsRemaining <= 0) {
+        status.textContent = 'This QR expired before verification finished. Generate a new one.';
+        verifyButton.textContent = 'QR Expired';
+        return;
     }
+
+    markUpiPaymentVerified();
 }
 
-function stopPaymentQrScanner() {
-    if (state.paymentQrScanFrame) {
-        cancelAnimationFrame(state.paymentQrScanFrame);
-        state.paymentQrScanFrame = null;
+function markUpiPaymentVerified() {
+    state.upiPaymentVerified = true;
+    clearInterval(state.paymentQrTimerInterval);
+    state.paymentQrTimerInterval = null;
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
+    const countdown = document.getElementById('upiQrCountdown');
+    const status = document.getElementById('upiPaymentStatus');
+    const verifyButton = document.getElementById('verifyUpiPaymentBtn');
+    if (countdown) {
+        countdown.textContent = 'Payment verified (simulated)';
+        countdown.classList.replace('text-orange-700', 'text-emerald-700');
     }
-    if (state.paymentQrScanStream) {
-        state.paymentQrScanStream.getTracks().forEach(track => track.stop());
-        state.paymentQrScanStream = null;
+    if (status) {
+        status.textContent = 'Payment marked as paid (simulation). Continue to place your order.';
+        status.classList.replace('text-slate-500', 'text-emerald-700');
     }
-    if (state.paymentQrReaderControls) {
-        state.paymentQrReaderControls.stop();
-        state.paymentQrReaderControls = null;
+    if (verifyButton) {
+        verifyButton.textContent = 'Paid (Simulated)';
+        verifyButton.disabled = true;
     }
-    const video = document.getElementById('paymentQrVideo');
-    const stopButton = document.getElementById('stopPaymentQrScannerBtn');
-    if (video) {
-        video.pause();
-        video.srcObject = null;
-        video.classList.add('hidden');
-    }
-    if (stopButton) stopButton.classList.add('hidden');
+    setUpiAppButtonsDisabled(true);
+    updateUpiPaymentAction();
+}
+
+function resetUpiPaymentVerification() {
+    state.upiPaymentVerified = false;
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
+    updateUpiPaymentAction();
+    setUpiAppButtonsDisabled(false);
+}
+
+function updateUpiPaymentAction() {
+    const button = document.getElementById('payViaQrBtn');
+    if (!button) return;
+    button.disabled = state.upiPaymentVerified;
+    button.textContent = state.upiPaymentVerified ? 'Payment Verified (Simulated)' : 'Pay via QR';
+    button.classList.toggle('opacity-60', state.upiPaymentVerified);
+    button.classList.toggle('cursor-not-allowed', state.upiPaymentVerified);
+}
+
+function closePaymentQrModal() {
+    clearInterval(state.paymentQrTimerInterval);
+    state.paymentQrTimerInterval = null;
+    closeUpiIntentPrompt();
+    document.getElementById('upiPaymentModal').classList.add('hidden');
 }
 
 // ------------------------------------------------------------------------------
@@ -502,6 +621,11 @@ function stopPaymentQrScanner() {
 async function submitOrder() {
     const { totalItems, totalPrice } = getCartCalculations();
     if (totalItems === 0) return;
+
+    if (state.selectedPaymentMethod === 'UPI_QR' && !state.upiPaymentVerified) {
+        openPaymentQrModal();
+        return;
+    }
 
     // Check Wallet Balance if WALLET_RFID is chosen
     if (state.selectedPaymentMethod === 'WALLET_RFID' && state.user.walletBalance < totalPrice) {
@@ -553,6 +677,8 @@ async function submitOrder() {
 
         // Reset Cart
         state.cart = {};
+        state.upiPaymentVerified = false;
+        updateUpiPaymentAction();
         updateCartUI();
         renderMenuItems();
         closeCheckoutModal();

@@ -81,6 +81,109 @@ body {
   animation: shake 0.4s ease-in-out;
 }
 
+.upi-qr-stage {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.upi-qr-code {
+  display: flex;
+  min-width: 220px;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+}
+
+.upi-qr-code img,
+.upi-qr-code canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.upi-qr-code:empty::after {
+  content: "Preparing QR code...";
+  color: #64748b;
+  font-size: 12px;
+}
+
+.upi-app-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.upi-app-button {
+  display: flex;
+  min-height: 68px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 700;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.upi-app-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.upi-app-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.upi-app-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gpay-mark { color: #2563eb; }
+.phonepe-mark { background: #6b21a8; color: #fff; }
+.paytm-mark { color: #0284c7; font-size: 9px; }
+.bhim-mark { color: #15803d; }
+.any-upi-mark { color: #c2410c; font-size: 9px; }
+
+.upi-app-any {
+  grid-column: span 2;
+  flex-direction: row;
+  min-height: 44px;
+}
+
+.upi-intent-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid #fed7aa;
+  border-top-color: #ea580c;
+  border-radius: 50%;
+  animation: upi-spin 0.8s linear infinite;
+}
+
+.upi-intent-spinner.is-complete {
+  display: none;
+}
+
+@keyframes upi-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Toggle Switch Styles */
 .switch {
   position: relative;

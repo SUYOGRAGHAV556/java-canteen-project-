@@ -24,6 +24,8 @@ const state = {
     trackerTimerInterval: null,
     paymentQrTimerInterval: null,
     paymentQrSecondsRemaining: 300,
+    upiIntentTimerInterval: null,
+    upiIntentSecondsRemaining: 120,
     upiPaymentVerified: false,
     stompClient: null
 };
@@ -409,7 +411,7 @@ function openPaymentQrModal() {
 
     const upiParams = new URLSearchParams({
         pa: 'suyograghav361@okhdfcbank',
-        pn: 'SmartCanteen',
+        pn: 'Suyog Raghav',
         am: totalPrice.toFixed(2),
         cu: 'INR'
     });
@@ -421,7 +423,99 @@ function openPaymentQrModal() {
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
     });
+    setUpiAppButtonsDisabled(false);
     startPaymentQrCountdown();
+}
+
+function launchUpiApp(app) {
+    if (state.upiPaymentVerified || state.paymentQrSecondsRemaining <= 0) return;
+
+    if (!isMobileDevice()) {
+        document.getElementById('upiPaymentStatus').textContent = 'Desktop detected. Scan the QR code above with your phone to pay.';
+        return;
+    }
+
+    const { totalItems, totalPrice } = getCartCalculations();
+    if (totalItems === 0) return;
+
+    const upiParams = new URLSearchParams({
+        pa: 'suyograghav361@okhdfcbank',
+        pn: 'Suyog Raghav',
+        am: totalPrice.toFixed(2),
+        cu: 'INR'
+    });
+    const query = upiParams.toString();
+    const deepLinks = {
+        gpay: `tez://upi/pay?${query}`,
+        phonepe: `phonepe://pay?${query}`,
+        paytm: `paytmmp://pay?${query}`,
+        bhim: `upi://pay?${query}`,
+        any: `upi://pay?${query}`
+    };
+    const appNames = {
+        gpay: 'Google Pay',
+        phonepe: 'PhonePe',
+        paytm: 'Paytm',
+        bhim: 'BHIM',
+        any: 'your UPI app'
+    };
+
+    openUpiIntentPrompt(appNames[app] || 'your UPI app');
+    window.location.href = deepLinks[app] || deepLinks.any;
+}
+
+function isMobileDevice() {
+    return navigator.userAgentData?.mobile === true || /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function openUpiIntentPrompt(appName) {
+    const modal = document.getElementById('upiIntentPromptModal');
+    const title = document.getElementById('upiIntentPromptTitle');
+    const status = document.getElementById('upiIntentWaitStatus');
+    const paidButton = document.getElementById('upiIntentPaidBtn');
+    const spinner = document.getElementById('upiIntentSpinner');
+
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentSecondsRemaining = 120;
+    title.textContent = `Opening ${appName}...`;
+    status.textContent = 'Waiting for confirmation... 02:00';
+    paidButton.disabled = false;
+    paidButton.textContent = 'I Have Paid';
+    spinner.classList.remove('is-complete');
+    modal.classList.remove('hidden');
+    state.upiIntentTimerInterval = setInterval(() => {
+        if (state.upiPaymentVerified) return;
+        state.upiIntentSecondsRemaining = Math.max(0, state.upiIntentSecondsRemaining - 1);
+        const minutes = Math.floor(state.upiIntentSecondsRemaining / 60);
+        const seconds = state.upiIntentSecondsRemaining % 60;
+        if (state.upiIntentSecondsRemaining === 0) {
+            clearInterval(state.upiIntentTimerInterval);
+            state.upiIntentTimerInterval = null;
+            status.textContent = 'Still waiting. Payment confirmation is simulated in this demo.';
+            return;
+        }
+        status.textContent = `Waiting for confirmation... ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, 1000);
+}
+
+function confirmUpiIntentPayment() {
+    markUpiPaymentVerified();
+    document.getElementById('upiIntentWaitStatus').textContent = 'Payment marked as paid (simulation). Return to checkout to place your order.';
+    document.getElementById('upiIntentPaidBtn').textContent = 'Paid (Simulated)';
+    document.getElementById('upiIntentPaidBtn').disabled = true;
+    document.getElementById('upiIntentSpinner').classList.add('is-complete');
+}
+
+function closeUpiIntentPrompt() {
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
+    document.getElementById('upiIntentPromptModal').classList.add('hidden');
+}
+
+function setUpiAppButtonsDisabled(disabled) {
+    document.querySelectorAll('.upi-app-button').forEach(button => {
+        button.disabled = disabled;
+    });
 }
 
 function startPaymentQrCountdown() {
@@ -436,6 +530,7 @@ function startPaymentQrCountdown() {
             state.paymentQrTimerInterval = null;
             document.getElementById('upiPaymentStatus').textContent = 'This QR expired. Close and generate a new one.';
             document.getElementById('verifyUpiPaymentBtn').disabled = true;
+            setUpiAppButtonsDisabled(true);
         }
     }, 1000);
 }
@@ -469,6 +564,8 @@ function markUpiPaymentVerified() {
     state.upiPaymentVerified = true;
     clearInterval(state.paymentQrTimerInterval);
     state.paymentQrTimerInterval = null;
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
     const countdown = document.getElementById('upiQrCountdown');
     const status = document.getElementById('upiPaymentStatus');
     const verifyButton = document.getElementById('verifyUpiPaymentBtn');
@@ -484,12 +581,16 @@ function markUpiPaymentVerified() {
         verifyButton.textContent = 'Paid (Simulated)';
         verifyButton.disabled = true;
     }
+    setUpiAppButtonsDisabled(true);
     updateUpiPaymentAction();
 }
 
 function resetUpiPaymentVerification() {
     state.upiPaymentVerified = false;
+    clearInterval(state.upiIntentTimerInterval);
+    state.upiIntentTimerInterval = null;
     updateUpiPaymentAction();
+    setUpiAppButtonsDisabled(false);
 }
 
 function updateUpiPaymentAction() {
@@ -504,6 +605,7 @@ function updateUpiPaymentAction() {
 function closePaymentQrModal() {
     clearInterval(state.paymentQrTimerInterval);
     state.paymentQrTimerInterval = null;
+    closeUpiIntentPrompt();
     document.getElementById('upiPaymentModal').classList.add('hidden');
 }
 

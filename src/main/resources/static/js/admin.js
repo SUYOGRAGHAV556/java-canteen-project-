@@ -250,7 +250,7 @@ function renderAdminMenuGrid() {
     container.innerHTML = adminState.menuItems.map(item => `
         <div class="bg-white rounded-2xl p-4 border ${item.available ? 'border-slate-200' : 'border-rose-300 bg-rose-50/30'} shadow-xs flex items-center justify-between gap-3 transition">
             <div class="flex items-center gap-3">
-                <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=200'}" class="w-14 h-14 rounded-xl object-cover border border-slate-100 flex-shrink-0">
+                <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'}" alt="${item.name}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200';" class="w-14 h-14 rounded-xl object-cover border border-slate-100 flex-shrink-0">
                 <div>
                     <h4 class="font-bold text-slate-900 text-xs">${item.name}</h4>
                     <div class="text-[11px] text-slate-500 font-semibold">₹${Number(item.price).toFixed(2)} • <span class="capitalize text-slate-600">${item.category.toLowerCase()}</span></div>

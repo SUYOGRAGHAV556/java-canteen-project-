@@ -338,8 +338,8 @@ function createOrderCardHtml(order) {
                 <div>
                     <div class="flex items-center gap-2">
                         <span class="text-xl font-black font-mono text-white tracking-tight">#${order.orderNumber}</span>
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${order.paymentMethod === 'WALLET_RFID' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/50' : 'bg-orange-950 text-orange-300 border border-orange-800/50'}">
-                            ${order.paymentMethod === 'WALLET_RFID' ? 'RFID Paid' : 'UPI Paid'}
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${order.paymentMethod === 'WALLET_RFID' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/50' : order.paymentMethod === 'CASH_COUNTER' ? 'bg-amber-950 text-amber-300 border border-amber-800/50' : 'bg-orange-950 text-orange-300 border border-orange-800/50'}">
+                            ${order.paymentMethod === 'WALLET_RFID' ? 'RFID Paid' : order.paymentMethod === 'CASH_COUNTER' ? 'Cash at Counter' : 'UPI Paid'}
                         </span>
                     </div>
                     <div class="text-xs font-semibold text-slate-300 mt-0.5">${order.customerName} <span class="text-slate-500 text-[10px]">(${order.customerPhone || ''})</span></div>

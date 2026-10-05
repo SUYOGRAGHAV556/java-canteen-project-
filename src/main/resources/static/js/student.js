@@ -9,16 +9,15 @@ const state = {
         name: 'Suyog Raghav',
         phone: '+91 98765 43210',
         rfidTag: 'RFID-9842',
-        walletBalance: 850.00
     },
     menuItems: [],
     cart: {}, // { itemId: quantity }
     currentCategory: 'ALL',
     searchQuery: '',
-    vegOnly: false,
+    dietaryFilter: 'ALL',
     quickPrepOnly: false,
     selectedPickupTime: 'ASAP (10-15m)',
-    selectedPaymentMethod: 'WALLET_RFID',
+    selectedPaymentMethod: 'CASH_COUNTER',
     activeOrder: null, // Holds currently tracked order object
     activeTrackingOrderNumber: null,
     trackerTimerInterval: null,
@@ -32,7 +31,6 @@ const state = {
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
-    fetchWalletBalance();
     fetchMenuItems();
     connectWebSocket();
     checkStoredActiveOrder();
@@ -119,33 +117,13 @@ async function fetchMenuItems() {
     }
 }
 
-async function fetchWalletBalance() {
-    try {
-        const res = await fetch(`/api/wallet/user/${state.user.id}`);
-        if (res.ok) {
-            const data = await res.json();
-            state.user.walletBalance = data.balance;
-            updateWalletDisplay();
-        }
-    } catch (err) {
-        console.warn('Could not load wallet:', err);
-    }
-}
-
-function updateWalletDisplay() {
-    const formatted = `₹${Number(state.user.walletBalance).toFixed(2)}`;
-    const el = document.getElementById('walletBalanceDisplay');
-    const checkoutEl = document.getElementById('checkoutWalletBalance');
-    if (el) el.textContent = formatted;
-    if (checkoutEl) checkoutEl.textContent = formatted;
-}
-
 // ------------------------------------------------------------------------------
 // RENDERING MENU ITEMS
 // ------------------------------------------------------------------------------
 function renderMenuItems() {
     const container = document.getElementById('menuGrid');
     const filtered = state.menuItems.filter(item => {
+        const isVeg = item.veg ?? item.isVeg;
         // Category filter
         if (state.currentCategory !== 'ALL' && item.category !== state.currentCategory) return false;
         // Search filter
@@ -155,8 +133,9 @@ function renderMenuItems() {
             const matchDesc = item.description ? item.description.toLowerCase().includes(query) : false;
             if (!matchName && !matchDesc) return false;
         }
-        // Veg filter
-        if (state.vegOnly && !item.veg) return false;
+        // Dietary filter
+        if (state.dietaryFilter === 'VEG' && !isVeg) return false;
+        if (state.dietaryFilter === 'NON_VEG' && isVeg) return false;
         // Quick prep filter
         if (state.quickPrepOnly && item.prepTimeMinutes > 8) return false;
 
@@ -177,6 +156,7 @@ function renderMenuItems() {
     }
 
     container.innerHTML = filtered.map(item => {
+        const isVeg = item.veg ?? item.isVeg;
         const qty = state.cart[item.id] || 0;
         const isSoldOut = !item.available;
 
@@ -192,15 +172,16 @@ function renderMenuItems() {
 
                 <!-- Food Thumbnail Image -->
                 <div class="relative w-full h-44 rounded-2xl overflow-hidden mb-3 bg-slate-100 group">
-                    <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600'}" 
+                    <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'}"
                          alt="${item.name}" 
                          loading="lazy"
+                         onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500';"
                          class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                     
                     <!-- Dietary Tag & Prep Badge -->
                     <div class="absolute bottom-2 left-2 flex items-center gap-1.5">
                         <span class="bg-white/95 backdrop-blur px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-800 shadow-xs flex items-center gap-1">
-                            ${item.veg ? '<span class="w-2 h-2 rounded-full bg-emerald-600"></span> Veg' : '<span class="w-2 h-2 rounded-full bg-rose-600"></span> Non-Veg'}
+                            ${isVeg ? '<span class="w-2 h-2 rounded-full bg-emerald-600"></span> Veg' : '<span class="w-2 h-2 rounded-full bg-rose-600"></span> Non-Veg'}
                         </span>
                         <span class="bg-white/95 backdrop-blur px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-700 shadow-xs flex items-center gap-1">
                             <span>⚡</span> ${item.prepTimeMinutes || 8} mins
@@ -308,7 +289,6 @@ function openCheckoutModal() {
     if (totalItems === 0) return;
 
     renderCheckoutItems();
-    updateWalletDisplay();
 
     document.getElementById('checkoutModal').classList.remove('hidden');
 }
@@ -621,13 +601,6 @@ async function submitOrder() {
         return;
     }
 
-    // Check Wallet Balance if WALLET_RFID is chosen
-    if (state.selectedPaymentMethod === 'WALLET_RFID' && state.user.walletBalance < totalPrice) {
-        alert(`⚠️ Insufficient RFID Balance!\nRequired: ₹${totalPrice.toFixed(2)}\nAvailable: ₹${state.user.walletBalance.toFixed(2)}\n\nPlease top up your wallet or select UPI.`);
-        openRechargeModal();
-        return;
-    }
-
     const confirmBtn = document.getElementById('confirmOrderBtn');
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = `
@@ -663,11 +636,7 @@ async function submitOrder() {
 
         const createdOrder = await res.json();
 
-        // Deduct local balance
-        if (state.selectedPaymentMethod === 'WALLET_RFID') {
-            state.user.walletBalance -= totalPrice;
-            updateWalletDisplay();
-        }
+        const isCashPayment = state.selectedPaymentMethod === 'CASH_COUNTER';
 
         // Reset Cart
         state.cart = {};
@@ -680,8 +649,9 @@ async function submitOrder() {
         // Save active order locally
         localStorage.setItem('smart_canteen_active_order', createdOrder.orderNumber);
 
-        // Launch Live Tracker Modal
-        launchOrderTracker(createdOrder);
+        // Show the cash collection instructions before opening the live tracker.
+        launchOrderTracker(createdOrder, !isCashPayment);
+        if (isCashPayment) openCashOrderStatus(createdOrder, createdOrder.totalAmount);
 
     } catch (err) {
         alert('Order Error: ' + err.message);
@@ -694,7 +664,7 @@ async function submitOrder() {
 // ------------------------------------------------------------------------------
 // LIVE ORDER PREPARATION COUNTDOWN & TRACKING ENGINE
 // ------------------------------------------------------------------------------
-function launchOrderTracker(order) {
+function launchOrderTracker(order, showModal = true) {
     state.activeOrder = order;
     state.activeTrackingOrderNumber = order.orderNumber;
 
@@ -728,7 +698,23 @@ function launchOrderTracker(order) {
     updateActiveBanner(order);
     startTrackerCountdown();
 
-    document.getElementById('trackerModal').classList.remove('hidden');
+    document.getElementById('trackerModal').classList.toggle('hidden', !showModal);
+}
+
+function openCashOrderStatus(order, totalAmount) {
+    document.getElementById('cashOrderMessage').textContent =
+        `Order Placed! Please pay ₹${Number(totalAmount).toFixed(2)} in cash at the canteen counter to collect your order.`;
+    document.getElementById('cashOrderToken').textContent = `#${order.orderNumber}`;
+    document.getElementById('cashOrderModal').classList.remove('hidden');
+}
+
+function openCashOrderTracker() {
+    document.getElementById('cashOrderModal').classList.add('hidden');
+    if (state.activeOrder) launchOrderTracker(state.activeOrder);
+}
+
+function closeCashOrderStatus() {
+    document.getElementById('cashOrderModal').classList.add('hidden');
 }
 
 function closeTrackerModal() {
@@ -983,46 +969,6 @@ async function fetchOrderByNumber(orderNumber, showAlertOnFail = true) {
 }
 
 // ------------------------------------------------------------------------------
-// WALLET RECHARGE
-// ------------------------------------------------------------------------------
-function openRechargeModal() {
-    document.getElementById('rechargeModal').classList.remove('hidden');
-}
-
-function closeRechargeModal() {
-    document.getElementById('rechargeModal').classList.add('hidden');
-}
-
-function setRechargeVal(val) {
-    document.getElementById('customRechargeAmount').value = val;
-}
-
-async function executeWalletRecharge() {
-    const amount = Number(document.getElementById('customRechargeAmount').value);
-    if (!amount || amount < 10) {
-        alert('Please enter a valid amount (min ₹10)');
-        return;
-    }
-
-    try {
-        const res = await fetch(`/api/wallet/user/${state.user.id}/recharge`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount, paymentReference: 'UPI-SIM-' + Date.now() })
-        });
-
-        if (!res.ok) throw new Error('Recharge failed');
-        const updated = await res.json();
-        state.user.walletBalance = updated.balance;
-        updateWalletDisplay();
-        closeRechargeModal();
-        alert(`✅ RFID Wallet topped up successfully!\nNew Balance: ₹${Number(updated.balance).toFixed(2)}`);
-    } catch (err) {
-        alert('Error: ' + err.message);
-    }
-}
-
-// ------------------------------------------------------------------------------
 // FILTERS & SEARCH HANDLERS
 // ------------------------------------------------------------------------------
 function handleSearch(val) {
@@ -1055,14 +1001,13 @@ function filterCategory(cat) {
     renderMenuItems();
 }
 
-function toggleVegFilter() {
-    state.vegOnly = !state.vegOnly;
-    const btn = document.getElementById('vegFilterBtn');
-    if (state.vegOnly) {
-        btn.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-800');
-    } else {
-        btn.classList.remove('bg-emerald-50', 'border-emerald-500', 'text-emerald-800');
-    }
+function filterDietary(filter) {
+    state.dietaryFilter = filter;
+    document.querySelectorAll('.dietary-filter-btn').forEach(button => {
+        const isActive = button.getAttribute('onclick') === `filterDietary('${filter}')`;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    });
     renderMenuItems();
 }
 

@@ -49,6 +49,34 @@ INSERT INTO menu_items (id, name, category, price, description, image_url, is_ve
 (22, 'Butter Chicken with Jeera Rice', 'MEALS', 150.00, 'Succulent tandoori chicken tikka pieces in rich creamy tomato butter gravy paired with aromatic basmati rice', 'https://images.unsplash.com/photo-1705174427925-744646e72117?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YnV0dGVyJTIwY2hpY2tlbnxlbnwwfHwwfHx8MA%3D%3D', FALSE, TRUE, 12, CURRENT_TIMESTAMP),
 (23, 'Hot Gulab Jamun with Rabri (2 Pcs)', 'MEALS', 60.00, 'Soft melt-in-mouth golden khoya dumplings served warm with chilled thick rabri and rose cardamom sugar syrup', 'https://images.unsplash.com/photo-1681476747916-8a8fc7e2001e?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Z3VsYWIlMjBqYW11biUyMHdpdGglMjByYWJyaXxlbnwwfHwwfHx8MA%3D%3D', TRUE, TRUE, 3, CURRENT_TIMESTAMP);
 
+-- Add breakfast non-veg choices on both fresh and persistent database installs.
+INSERT INTO menu_items (name, category, price, description, image_url, is_veg, is_available, prep_time_minutes, created_at)
+SELECT 'Anda Bhurji Pav', 'BREAKFAST', 75.00, 'Spicy Indian-style scrambled eggs with onion, tomato and green chilli, served with butter-toasted pav', 'https://images.unsplash.com/photo-1563690449029-d6e1b8d6003d?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8aW5kaWFuJTIwc2NyYW1ibGVkJTIwZWdnc3xlbnwwfHwwfHx8MA%3D%3Dt', FALSE, TRUE, 7, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = 'Anda Bhurji Pav');
+
+INSERT INTO menu_items (name, category, price, description, image_url, is_veg, is_available, prep_time_minutes, created_at)
+SELECT 'Masala Omelette & Toast', 'BREAKFAST', 65.00, 'Fluffy two-egg omelette with onion, tomato, coriander and green chilli, served with toasted bread', 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=600&auto=format&fit=crop&q=80', FALSE, TRUE, 6, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = 'Masala Omelette & Toast');
+
+INSERT INTO menu_items (name, category, price, description, image_url, is_veg, is_available, prep_time_minutes, created_at)
+SELECT 'Egg Paratha Roll', 'BREAKFAST', 85.00, 'Flaky tawa paratha wrapped around a seasoned egg omelette with sliced onions and mint chutney', 'https://plus.unsplash.com/premium_photo-1663855532098-0b71ad21f6e7?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZWdnJTIwcGFyYXRoYSUyMHJvbGx8ZW58MHx8MHx8fDA%3D', FALSE, TRUE, 8, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = 'Egg Paratha Roll');
+
+INSERT INTO menu_items (name, category, price, description, image_url, is_veg, is_available, prep_time_minutes, created_at)
+SELECT 'Chicken Keema Paratha', 'BREAKFAST', 120.00, 'Tawa-toasted whole-wheat paratha stuffed with aromatic spiced minced chicken, served with curd', 'https://imgs.search.brave.com/lBgWzgJvMwxjR1Fc9fcRuOc28tQyWeXDON6qICMrGRQ/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9pbWFn/ZXMuaGVyemluZGFn/aS5pbmZvL2ltYWdl/LzIwMjQvQXByL0No/aWNrZW4tS2VlbWEt/UGFyYXRoYS5qcGc', FALSE, TRUE, 12, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = 'Chicken Keema Paratha');
+
+INSERT INTO menu_items (name, category, price, description, image_url, is_veg, is_available, prep_time_minutes, created_at)
+SELECT 'Chicken Keema Pav', 'BREAKFAST', 110.00, 'https://imgs.search.brave.com/O4aE6wYt62TJNQDAsh_1UDaaNKlRVWOa5c5-f6WF1uQ/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9pbmRp/YW4tY2hpY2tlbi1r/ZWVtYS1wYXYtYnV0/dGVyZWQtYnJlYWQt/cm9sbHMtc3BpY3kt/a2hlZW1hLXNlcnZl/ZC10b3BwZWQtYnV0/dGVyLWZyZXNoLWNv/cmlhbmRlci1vbmlv/bi1yaW5ncy1wb3B1/bGFyLTQ0MzQyNDI2/MS5qcGc', 'https://imgs.search.brave.com/kxe20j5-IhTLvXpH_KUH6eDPzsy75Fw7hM99MtsAt-4/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9pbmRp/YW4tY2hpY2tlbi1r/ZWVtYS1wYXYtYnV0/dGVyZWQtYnJlYWQt/cm9sbHMtc3BpY3kt/a2hlZW1hLXNlcnZl/ZC10b3BwZWQtYnV0/dGVyLWZyZXNoLWNv/cmlhbmRlci1vbmlv/bi1yaW5ncy1wb3B1/bGFyLTQ0MzQyNDI5/MS5qcGc', FALSE, TRUE, 10, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = 'Chicken Keema Pav');
+
+-- Keep breakfast dish photos in sync with existing persistent database rows.
+UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1563690449029-d6e1b8d6003d?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8aW5kaWFuJTIwc2NyYW1ibGVkJTIwZWdnc3xlbnwwfHwwfHx8MA%3D%3Dt' WHERE name = 'Anda Bhurji Pav';
+UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=600&auto=format&fit=crop&q=80' WHERE name = 'Masala Omelette & Toast';
+UPDATE menu_items SET image_url = 'https://plus.unsplash.com/premium_photo-1663855532098-0b71ad21f6e7?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZWdnJTIwcGFyYXRoYSUyMHJvbGx8ZW58MHx8MHx8fDA%3D' WHERE name = 'Egg Paratha Roll';
+UPDATE menu_items SET image_url = 'https://imgs.search.brave.com/lBgWzgJvMwxjR1Fc9fcRuOc28tQyWeXDON6qICMrGRQ/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9pbWFn/ZXMuaGVyemluZGFn/aS5pbmZvL2ltYWdl/LzIwMjQvQXByL0No/aWNrZW4tS2VlbWEtUGFyYXRoYS5qcGc' WHERE name = 'Chicken Keema Paratha';
+UPDATE menu_items SET description = 'Mumbai-style spiced minced chicken topped with fresh coriander and served with butter-toasted pav', image_url = 'https://imgs.search.brave.com/O4aE6wYt62TJNQDAsh_1UDaaNKlRVWOa5c5-f6WF1uQ/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9pbmRp/YW4tY2hpY2tlbi1r/ZWVtYS1wYXYtYnV0/dGVyZWQtYnJlYWQtcm9sbHMtc3BpY3kt/a2hlZW1hLXNlcnZlZC10b3BwZWQtYnV0dGVyLWZyZXNoLWNv/cmlhbmRlci1vbmlv/bi1yaW5ncy1wb3B1/bGFyLTQ0MzQyNDI2MS5qcGc' WHERE name = 'Chicken Keema Pav';
+
 -- Keep corrected menu photos in sync with persistent databases on startup.
 UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1676976197340-be65999b7516?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hvbGUlMjBrdWxjaGV8ZW58MHx8MHx8fDA%3D' WHERE id = 2;
 UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1789991184412-c29c9dfa2b39?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8cG9oYXxlbnwwfHwwfHx8MA%3D%3D' WHERE id = 3;
@@ -96,3 +124,6 @@ INSERT INTO order_items (id, order_id, menu_item_id, item_name, unit_price, quan
 -- 7. NOTIFICATION LOGS
 INSERT INTO notification_logs (id, order_id, phone, recipient_name, message, type, status, sent_at) VALUES
 (1, 3, '+91 98234 56789', 'Aarav Patel', '🔔 Canteen Alert: Your Order #ORD-103 is freshly prepared and READY for pickup at Counter 2! Please present your Token.', 'SMS', 'SENT', CURRENT_TIMESTAMP);
+
+-- Keep discontinued dishes out of persistent menu databases on every startup.
+DELETE FROM menu_items WHERE name IN ('Chicken Keema Paratha', 'Chicken Keema Pav');

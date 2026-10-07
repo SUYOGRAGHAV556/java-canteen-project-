@@ -740,13 +740,18 @@ function tickPreparationTimer() {
     if (!state.activeOrder) return;
 
     const order = state.activeOrder;
-    const createdAt = new Date(order.createdAt).getTime() || Date.now();
+    const createdAtValue = new Date(order.createdAt).getTime();
+    const createdAt = Number.isFinite(createdAtValue) ? createdAtValue : Date.now();
+    const prepStartedAtValue = order.status === 'PREPARING' && order.updatedAt
+        ? new Date(order.updatedAt).getTime()
+        : createdAt;
+    const prepStartedAt = Number.isFinite(prepStartedAtValue) ? prepStartedAtValue : createdAt;
     const now = Date.now();
-    const elapsedSeconds = Math.max(0, Math.floor((now - createdAt) / 1000));
-    
-    const totalPrepMinutes = order.estimatedPrepMinutes || 10;
+    const elapsedSeconds = Math.max(0, Math.floor((now - prepStartedAt) / 1000));
+
+    const totalPrepMinutes = Math.max(1, order.estimatedPrepMinutes || 10);
     const totalPrepSeconds = totalPrepMinutes * 60;
-    const remainingSeconds = Math.max(0, totalPrepSeconds - elapsedSeconds);
+    const remainingSeconds = Math.max(1, totalPrepSeconds - elapsedSeconds);
 
     // Format minutes & seconds
     const remMin = Math.floor(remainingSeconds / 60);
@@ -754,7 +759,7 @@ function tickPreparationTimer() {
     const timeFormatted = `${String(remMin).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
 
     // Estimated pickup time
-    const pickupDate = new Date(createdAt + totalPrepSeconds * 1000);
+    const pickupDate = new Date(prepStartedAt + totalPrepSeconds * 1000);
     const pickupTimeStr = pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const timerEl = document.getElementById('trackerCountdownTimer');

@@ -1,6 +1,6 @@
-# 🍔 Smart Canteen Management System (Enterprise Edition)
+# 🍔 Campus Bites (Smart Canteen Management System)
 
-A high-performance, real-time, touch-optimized **Smart Canteen Management System** built with a **100% free and open-source tech stack**:
+A high-performance, real-time, touch-optimized **Campus Bites canteen management system** built with a **100% free and open-source tech stack**:
 - **Backend:** Java 17+, Spring Boot 3.3.4, Hibernate / Spring Data JPA, Spring WebSocket (STOMP + SockJS).
 - **Database:** MySQL Community Edition (with instant zero-config embedded H2 fallback for plug-and-play development).
 - **Frontend:** HTML5, Tailwind CSS, Vanilla JavaScript, Chart.js (Analytics), and Web Audio API (Chime Alerts).

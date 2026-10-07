@@ -9,7 +9,7 @@ public class SmartCanteenApplication {
     public static void main(String[] args) {
         SpringApplication.run(SmartCanteenApplication.class, args);
         System.out.println("==================================================================");
-        System.out.println("🚀 Smart Canteen Management System is ONLINE!");
+        System.out.println("🚀 Campus Bites is ONLINE!");
         System.out.println("👉 Student Portal:        http://localhost:8080/");
         System.out.println("👉 Kitchen Display (KDS): http://localhost:8080/kds.html");
         System.out.println("👉 Owner Admin Dashboard: http://localhost:8080/admin.html");

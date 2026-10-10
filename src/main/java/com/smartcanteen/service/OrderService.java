@@ -25,6 +25,7 @@ public class OrderService {
     private final MenuItemRepository menuItemRepository;
     private final UserRepository userRepository;
     private final WalletService walletService;
+    private final InventoryService inventoryService;
     private final NotificationService notificationService;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -32,12 +33,14 @@ public class OrderService {
                         MenuItemRepository menuItemRepository,
                         UserRepository userRepository,
                         WalletService walletService,
+                        InventoryService inventoryService,
                         NotificationService notificationService,
                         SimpMessagingTemplate messagingTemplate) {
         this.orderRepository = orderRepository;
         this.menuItemRepository = menuItemRepository;
         this.userRepository = userRepository;
         this.walletService = walletService;
+        this.inventoryService = inventoryService;
         this.notificationService = notificationService;
         this.messagingTemplate = messagingTemplate;
     }
@@ -140,6 +143,8 @@ public class OrderService {
             Long userIdToDeduct = user != null ? user.getId() : 1L; // fallback to default student if demo
             walletService.deductBalance(userIdToDeduct, total);
         }
+
+        inventoryService.consumeForOrder(order.getItems());
 
         Order saved = orderRepository.save(order);
         OrderResponse response = new OrderResponse(saved);

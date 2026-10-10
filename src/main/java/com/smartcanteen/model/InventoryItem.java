@@ -101,4 +101,5 @@ public class InventoryItem {
     public void setLastRestockedAt(LocalDateTime lastRestockedAt) {
         this.lastRestockedAt = lastRestockedAt;
     }
+
 }

@@ -82,6 +82,23 @@ CREATE TABLE IF NOT EXISTS inventory (
     last_restocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7. RECIPE INGREDIENTS (Quantity consumed per menu-item serving)
+CREATE TABLE IF NOT EXISTS menu_item_ingredients (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    menu_item_id BIGINT NOT NULL,
+    inventory_id BIGINT NOT NULL,
+    quantity_used DECIMAL(10, 2) NOT NULL,
+    CONSTRAINT uq_menu_item_ingredient UNIQUE (menu_item_id, inventory_id),
+    CONSTRAINT fk_recipe_menu_item FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+    CONSTRAINT fk_recipe_inventory FOREIGN KEY (inventory_id) REFERENCES inventory(id) ON DELETE CASCADE
+);
+
+-- Tracks one-time seed-data adjustments without resetting live inventory on restart.
+CREATE TABLE IF NOT EXISTS app_data_migrations (
+    migration_key VARCHAR(100) PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 7. NOTIFICATION LOGS (SMS / Push triggers on Order Ready)
 CREATE TABLE IF NOT EXISTS notification_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -101,3 +118,4 @@ CREATE INDEX IF NOT EXISTS idx_menu_available ON menu_items(is_available);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_inventory_stock ON inventory(current_stock, minimum_threshold);
+CREATE INDEX IF NOT EXISTS idx_recipe_menu_item ON menu_item_ingredients(menu_item_id);

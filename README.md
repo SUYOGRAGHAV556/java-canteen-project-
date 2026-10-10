@@ -27,7 +27,7 @@ A high-performance, real-time, touch-optimized **Campus Bites canteen management
 
 ### 3. ⚙️ Non-Technical Owner & Admin Dashboard (`/admin.html`)
 - **⚡ One-Tap Availability Toggle:** Large tactile toggle switches to flip items between `"🟢 IN STOCK"` and `"🔴 SOLD OUT"`. Broadcasts instantly via WebSocket to all connected student phones without page refresh!
-- **📦 Raw Ingredient Inventory & Alerts:** Track stock levels (Milk, Buns, Paneer, Rice, Coffee, etc.) against minimum thresholds with automated low-stock warnings.
+- **📦 Raw Ingredient Inventory & Alerts:** Orders consume configured per-serving recipe quantities; low-stock warnings appear when an ingredient crosses its minimum threshold.
 - **📊 Visual Analytics (Chart.js):**
   - **Peak Rush Times:** Hourly order curve visualizing breakfast, lunch, and evening spikes.
   - **Top-Selling Dishes:** Horizontal bar chart comparing sales volume.
@@ -47,7 +47,8 @@ The full DDL schema is located in [`src/main/resources/schema.sql`](file:///d:/j
 4. **`orders`**: Order tickets with token numbers (`#ORD-XXX`), pickup times, total amounts, and payment methods.
 5. **`order_items`**: Line items for each order ticket.
 6. **`inventory`**: Raw ingredients with current stock, units (kg, L, pcs), and minimum alert thresholds.
-7. **`notification_logs`**: Audit trail of automated SMS/Push alerts dispatched to students.
+7. **`menu_item_ingredients`**: Ingredient quantities consumed for one serving of each menu item.
+8. **`notification_logs`**: Audit trail of automated SMS/Push alerts dispatched to students.
 
 ---
 

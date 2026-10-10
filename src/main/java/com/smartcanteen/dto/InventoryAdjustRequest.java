@@ -32,4 +32,5 @@ public class InventoryAdjustRequest {
     public void setReason(String reason) {
         this.reason = reason;
     }
+
 }

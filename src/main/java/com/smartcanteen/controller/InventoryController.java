@@ -42,4 +42,5 @@ public class InventoryController {
         InventoryItem updated = inventoryService.adjustStock(id, request);
         return ResponseEntity.ok(updated);
     }
+
 }

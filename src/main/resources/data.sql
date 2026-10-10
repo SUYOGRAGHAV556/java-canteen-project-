@@ -2,6 +2,9 @@
 -- SMART CANTEEN SEED DATA (AUTHENTIC INDIAN CUISINE & CAMPUS PROFILES)
 -- ==============================================================================
 
+-- Remove the retired per-batch expiry feature without changing aggregate stock.
+DROP TABLE IF EXISTS inventory_batches;
+
 -- 1. USERS
 INSERT INTO users (id, name, email, phone, role, rfid_tag, created_at) VALUES
 (1, 'Suyog Raghav', 'suyog.raghav@campus.edu', '+91 98765 43210', 'STUDENT', 'RFID-9842', CURRENT_TIMESTAMP),
@@ -90,18 +93,49 @@ UPDATE menu_items SET image_url = 'https://plus.unsplash.com/premium_photo-16941
 UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1705174427925-744646e72117?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YnV0dGVyJTIwY2hpY2tlbnxlbnwwfHwwfHx8MA%3D%3D' WHERE id = 22;
 UPDATE menu_items SET image_url = 'https://images.unsplash.com/photo-1681476747916-8a8fc7e2001e?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Z3VsYWIlMjBqYW11biUyMHdpdGglMjByYWJyaXxlbnwwfHwwfHx8MA%3D%3D' WHERE id = 23;
 
--- 4. INVENTORY / RAW INGREDIENTS (With Indian Ingredients & Low-Stock Showcase)
+-- 4. INVENTORY / RAW INGREDIENTS
 INSERT INTO inventory (id, ingredient_name, current_stock, unit, minimum_threshold, unit_cost, last_restocked_at) VALUES
 (1, 'Amul Salted Butter & Cream', 14.0, 'kg', 5.0, 480.00, CURRENT_TIMESTAMP),
 (2, 'Fresh Malai Paneer', 9.5, 'kg', 5.0, 320.00, CURRENT_TIMESTAMP),
 (3, 'Basmati Long Grain Rice', 35.0, 'kg', 10.0, 95.00, CURRENT_TIMESTAMP),
-(4, 'Assam CTC Chai Leaves', 2.0, 'kg', 4.0, 320.00, CURRENT_TIMESTAMP),                 -- LOW STOCK ALERT!
-(5, 'Potatoes & Onions (Aloo-Pyaaz)', 4.5, 'kg', 15.0, 35.00, CURRENT_TIMESTAMP),          -- LOW STOCK ALERT!
+(4, 'Assam CTC Chai Leaves', 20.0, 'kg', 4.0, 320.00, CURRENT_TIMESTAMP),
+(5, 'Potatoes & Onions (Aloo-Pyaaz)', 35.0, 'kg', 15.0, 35.00, CURRENT_TIMESTAMP),
 (6, 'Kabuli Chana (Chickpeas)', 18.0, 'kg', 6.0, 110.00, CURRENT_TIMESTAMP),
 (7, 'Fresh Pav Bread Buns', 64.0, 'pcs', 24.0, 5.00, CURRENT_TIMESTAMP),
 (8, 'Dosa & Idli Rice Batter', 12.0, 'kg', 5.0, 60.00, CURRENT_TIMESTAMP),
-(9, 'Amul Taaza Whole Milk', 3.5, 'Liters', 10.0, 54.00, CURRENT_TIMESTAMP),               -- LOW STOCK ALERT!
-(10, 'Garam Masala & Indian Spices Mix', 2.5, 'kg', 4.0, 450.00, CURRENT_TIMESTAMP);        -- LOW STOCK ALERT!
+(9, 'Amul Taaza Whole Milk', 30.0, 'Liters', 10.0, 54.00, CURRENT_TIMESTAMP),
+(10, 'Garam Masala & Indian Spices Mix', 8.0, 'kg', 4.0, 450.00, CURRENT_TIMESTAMP);
+
+INSERT INTO inventory (ingredient_name, current_stock, unit, minimum_threshold, unit_cost, last_restocked_at)
+SELECT seed.ingredient_name, seed.current_stock, seed.unit, seed.minimum_threshold, seed.unit_cost, CURRENT_TIMESTAMP
+FROM (
+    SELECT 'Whole Wheat Flour' AS ingredient_name, 25.00 AS current_stock, 'kg' AS unit, 5.00 AS minimum_threshold, 55.00 AS unit_cost
+    UNION ALL SELECT 'Cooking Oil', 30.00, 'Liters', 8.00, 140.00
+    UNION ALL SELECT 'Fresh Tomatoes', 18.00, 'kg', 5.00, 40.00
+    UNION ALL SELECT 'Fresh Chicken', 18.00, 'kg', 5.00, 260.00
+    UNION ALL SELECT 'Fresh Curd', 16.00, 'kg', 5.00, 80.00
+    UNION ALL SELECT 'Granulated Sugar', 18.00, 'kg', 5.00, 45.00
+    UNION ALL SELECT 'Eggs', 120.00, 'pcs', 24.00, 7.00
+    UNION ALL SELECT 'Bread Slices', 120.00, 'pcs', 24.00, 2.00
+    UNION ALL SELECT 'Poha', 15.00, 'kg', 4.00, 50.00
+    UNION ALL SELECT 'Mixed Lentils', 16.00, 'kg', 4.00, 120.00
+    UNION ALL SELECT 'Besan', 12.00, 'kg', 3.00, 75.00
+    UNION ALL SELECT 'Sweet Corn', 12.00, 'kg', 3.00, 90.00
+    UNION ALL SELECT 'Coffee Powder', 5.00, 'kg', 1.00, 520.00
+    UNION ALL SELECT 'Lemons', 100.00, 'pcs', 20.00, 4.00
+    UNION ALL SELECT 'Mint Leaves', 3.00, 'kg', 0.75, 180.00
+    UNION ALL SELECT 'Soda Water', 20.00, 'Liters', 5.00, 35.00
+    UNION ALL SELECT 'Almonds', 4.00, 'kg', 1.00, 850.00
+    UNION ALL SELECT 'Mango Pulp', 12.00, 'kg', 3.00, 180.00
+    UNION ALL SELECT 'Pistachios', 2.00, 'kg', 0.50, 1200.00
+    UNION ALL SELECT 'Kidney Beans', 12.00, 'kg', 3.00, 130.00
+    UNION ALL SELECT 'Mixed Vegetables', 18.00, 'kg', 5.00, 90.00
+    UNION ALL SELECT 'Khoya', 8.00, 'kg', 2.00, 300.00
+    UNION ALL SELECT 'Peanuts', 6.00, 'kg', 1.50, 160.00
+) seed
+WHERE NOT EXISTS (
+    SELECT 1 FROM inventory existing WHERE existing.ingredient_name = seed.ingredient_name
+);
 
 -- 5. INITIAL KITCHEN ORDERS (To immediately showcase live KDS functionality)
 INSERT INTO orders (id, order_number, user_id, customer_name, customer_phone, total_amount, status, payment_method, pickup_time_option, estimated_pickup_time, estimated_prep_minutes, special_instructions, created_at, updated_at) VALUES
@@ -127,3 +161,153 @@ INSERT INTO notification_logs (id, order_id, phone, recipient_name, message, typ
 
 -- Keep discontinued dishes out of persistent menu databases on every startup.
 DELETE FROM menu_items WHERE name IN ('Chicken Keema Paratha', 'Chicken Keema Pav');
+
+-- Convert only the original demo warning values; never reset stock that has since been changed.
+UPDATE inventory SET current_stock = 20.00
+WHERE ingredient_name = 'Assam CTC Chai Leaves' AND current_stock = 2.00 AND minimum_threshold = 4.00
+  AND NOT EXISTS (SELECT 1 FROM app_data_migrations WHERE migration_key = 'realistic-inventory-seed-v1');
+UPDATE inventory SET current_stock = 35.00
+WHERE ingredient_name = 'Potatoes & Onions (Aloo-Pyaaz)' AND current_stock = 4.50 AND minimum_threshold = 15.00
+  AND NOT EXISTS (SELECT 1 FROM app_data_migrations WHERE migration_key = 'realistic-inventory-seed-v1');
+UPDATE inventory SET current_stock = 30.00
+WHERE ingredient_name = 'Amul Taaza Whole Milk' AND current_stock = 3.50 AND minimum_threshold = 10.00
+  AND NOT EXISTS (SELECT 1 FROM app_data_migrations WHERE migration_key = 'realistic-inventory-seed-v1');
+UPDATE inventory SET current_stock = 8.00
+WHERE ingredient_name = 'Garam Masala & Indian Spices Mix' AND current_stock = 2.50 AND minimum_threshold = 4.00
+  AND NOT EXISTS (SELECT 1 FROM app_data_migrations WHERE migration_key = 'realistic-inventory-seed-v1');
+INSERT INTO app_data_migrations (migration_key)
+SELECT 'realistic-inventory-seed-v1'
+WHERE NOT EXISTS (
+    SELECT 1 FROM app_data_migrations WHERE migration_key = 'realistic-inventory-seed-v1'
+);
+
+-- Ingredient quantities are per one menu serving and use the inventory item's unit.
+INSERT INTO menu_item_ingredients (menu_item_id, inventory_id, quantity_used)
+SELECT menu_item.id, inventory_item.id, recipe.quantity_used
+FROM (
+    SELECT 'Crispy Masala Dosa & Sambar' AS menu_name, 'Dosa & Idli Rice Batter' AS ingredient_name, 0.25 AS quantity_used
+    UNION ALL SELECT 'Crispy Masala Dosa & Sambar', 'Potatoes & Onions (Aloo-Pyaaz)', 0.12
+    UNION ALL SELECT 'Crispy Masala Dosa & Sambar', 'Amul Salted Butter & Cream', 0.01
+    UNION ALL SELECT 'Crispy Masala Dosa & Sambar', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Amritsari Chole Bhature (2 Pcs)', 'Kabuli Chana (Chickpeas)', 0.12
+    UNION ALL SELECT 'Amritsari Chole Bhature (2 Pcs)', 'Whole Wheat Flour', 0.18
+    UNION ALL SELECT 'Amritsari Chole Bhature (2 Pcs)', 'Cooking Oil', 0.05
+    UNION ALL SELECT 'Amritsari Chole Bhature (2 Pcs)', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Indori Poha with Sev & Peanuts', 'Poha', 0.15
+    UNION ALL SELECT 'Indori Poha with Sev & Peanuts', 'Potatoes & Onions (Aloo-Pyaaz)', 0.04
+    UNION ALL SELECT 'Indori Poha with Sev & Peanuts', 'Peanuts', 0.01
+    UNION ALL SELECT 'Indori Poha with Sev & Peanuts', 'Cooking Oil', 0.01
+    UNION ALL SELECT 'Indori Poha with Sev & Peanuts', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Steamed Idli & Medu Vada Combo', 'Dosa & Idli Rice Batter', 0.30
+    UNION ALL SELECT 'Steamed Idli & Medu Vada Combo', 'Mixed Lentils', 0.03
+    UNION ALL SELECT 'Steamed Idli & Medu Vada Combo', 'Cooking Oil', 0.04
+    UNION ALL SELECT 'Aloo Pyaaz Paratha with Makhan', 'Whole Wheat Flour', 0.18
+    UNION ALL SELECT 'Aloo Pyaaz Paratha with Makhan', 'Potatoes & Onions (Aloo-Pyaaz)', 0.12
+    UNION ALL SELECT 'Aloo Pyaaz Paratha with Makhan', 'Amul Salted Butter & Cream', 0.02
+    UNION ALL SELECT 'Aloo Pyaaz Paratha with Makhan', 'Fresh Curd', 0.05
+    UNION ALL SELECT 'Delhi Style Samosa Chaat (2 Pcs)', 'Kabuli Chana (Chickpeas)', 0.08
+    UNION ALL SELECT 'Delhi Style Samosa Chaat (2 Pcs)', 'Potatoes & Onions (Aloo-Pyaaz)', 0.10
+    UNION ALL SELECT 'Delhi Style Samosa Chaat (2 Pcs)', 'Besan', 0.02
+    UNION ALL SELECT 'Delhi Style Samosa Chaat (2 Pcs)', 'Cooking Oil', 0.03
+    UNION ALL SELECT 'Delhi Style Samosa Chaat (2 Pcs)', 'Fresh Curd', 0.04
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Fresh Pav Bread Buns', 2.00
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Potatoes & Onions (Aloo-Pyaaz)', 0.20
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Mixed Vegetables', 0.10
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Fresh Tomatoes', 0.05
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Amul Salted Butter & Cream', 0.03
+    UNION ALL SELECT 'Mumbai Special Pav Bhaji', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Tandoori Paneer Tikka Sandwich', 'Fresh Malai Paneer', 0.10
+    UNION ALL SELECT 'Tandoori Paneer Tikka Sandwich', 'Bread Slices', 2.00
+    UNION ALL SELECT 'Tandoori Paneer Tikka Sandwich', 'Fresh Curd', 0.03
+    UNION ALL SELECT 'Tandoori Paneer Tikka Sandwich', 'Amul Salted Butter & Cream', 0.01
+    UNION ALL SELECT 'Tandoori Paneer Tikka Sandwich', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Mumbai Vada Pav (2 Pcs)', 'Fresh Pav Bread Buns', 2.00
+    UNION ALL SELECT 'Mumbai Vada Pav (2 Pcs)', 'Potatoes & Onions (Aloo-Pyaaz)', 0.12
+    UNION ALL SELECT 'Mumbai Vada Pav (2 Pcs)', 'Cooking Oil', 0.03
+    UNION ALL SELECT 'Mumbai Vada Pav (2 Pcs)', 'Peanuts', 0.01
+    UNION ALL SELECT 'Mumbai Vada Pav (2 Pcs)', 'Besan', 0.03
+    UNION ALL SELECT 'Crispy Onion & Corn Pakoda', 'Potatoes & Onions (Aloo-Pyaaz)', 0.10
+    UNION ALL SELECT 'Crispy Onion & Corn Pakoda', 'Sweet Corn', 0.04
+    UNION ALL SELECT 'Crispy Onion & Corn Pakoda', 'Besan', 0.08
+    UNION ALL SELECT 'Crispy Onion & Corn Pakoda', 'Cooking Oil', 0.04
+    UNION ALL SELECT 'Crispy Onion & Corn Pakoda', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Chicken Tikka Kathi Roll', 'Fresh Chicken', 0.15
+    UNION ALL SELECT 'Chicken Tikka Kathi Roll', 'Whole Wheat Flour', 0.10
+    UNION ALL SELECT 'Chicken Tikka Kathi Roll', 'Fresh Curd', 0.03
+    UNION ALL SELECT 'Chicken Tikka Kathi Roll', 'Potatoes & Onions (Aloo-Pyaaz)', 0.04
+    UNION ALL SELECT 'Chicken Tikka Kathi Roll', 'Amul Salted Butter & Cream', 0.01
+    UNION ALL SELECT 'Special Kulhad Masala Chai', 'Assam CTC Chai Leaves', 0.01
+    UNION ALL SELECT 'Special Kulhad Masala Chai', 'Amul Taaza Whole Milk', 0.15
+    UNION ALL SELECT 'Special Kulhad Masala Chai', 'Granulated Sugar', 0.02
+    UNION ALL SELECT 'Special Kulhad Masala Chai', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Punjabi Kesar Pista Lassi', 'Fresh Curd', 0.20
+    UNION ALL SELECT 'Punjabi Kesar Pista Lassi', 'Granulated Sugar', 0.02
+    UNION ALL SELECT 'Punjabi Kesar Pista Lassi', 'Pistachios', 0.01
+    UNION ALL SELECT 'South Indian Filter Coffee', 'Coffee Powder', 0.01
+    UNION ALL SELECT 'South Indian Filter Coffee', 'Amul Taaza Whole Milk', 0.15
+    UNION ALL SELECT 'South Indian Filter Coffee', 'Granulated Sugar', 0.02
+    UNION ALL SELECT 'Fresh Alphonso Mango Lassi', 'Fresh Curd', 0.15
+    UNION ALL SELECT 'Fresh Alphonso Mango Lassi', 'Mango Pulp', 0.10
+    UNION ALL SELECT 'Fresh Alphonso Mango Lassi', 'Granulated Sugar', 0.02
+    UNION ALL SELECT 'Spiced Masala Nimbu Shikanji', 'Lemons', 1.00
+    UNION ALL SELECT 'Spiced Masala Nimbu Shikanji', 'Soda Water', 0.20
+    UNION ALL SELECT 'Spiced Masala Nimbu Shikanji', 'Mint Leaves', 0.01
+    UNION ALL SELECT 'Spiced Masala Nimbu Shikanji', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Chilled Badam Kesar Milk', 'Amul Taaza Whole Milk', 0.25
+    UNION ALL SELECT 'Chilled Badam Kesar Milk', 'Almonds', 0.01
+    UNION ALL SELECT 'Chilled Badam Kesar Milk', 'Granulated Sugar', 0.02
+    UNION ALL SELECT 'Chilled Badam Kesar Milk', 'Pistachios', 0.01
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Fresh Malai Paneer', 0.15
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Basmati Long Grain Rice', 0.10
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Fresh Tomatoes', 0.08
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Amul Salted Butter & Cream', 0.03
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Amul Taaza Whole Milk', 0.05
+    UNION ALL SELECT 'Royal Shahi Paneer Rice Bowl', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Hyderabadi Veg Dum Biryani', 'Basmati Long Grain Rice', 0.15
+    UNION ALL SELECT 'Hyderabadi Veg Dum Biryani', 'Mixed Vegetables', 0.12
+    UNION ALL SELECT 'Hyderabadi Veg Dum Biryani', 'Fresh Curd', 0.03
+    UNION ALL SELECT 'Hyderabadi Veg Dum Biryani', 'Garam Masala & Indian Spices Mix', 0.02
+    UNION ALL SELECT 'Dal Makhani & Jeera Rice Combo', 'Mixed Lentils', 0.10
+    UNION ALL SELECT 'Dal Makhani & Jeera Rice Combo', 'Basmati Long Grain Rice', 0.10
+    UNION ALL SELECT 'Dal Makhani & Jeera Rice Combo', 'Amul Salted Butter & Cream', 0.02
+    UNION ALL SELECT 'Dal Makhani & Jeera Rice Combo', 'Amul Taaza Whole Milk', 0.05
+    UNION ALL SELECT 'Dal Makhani & Jeera Rice Combo', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Punjabi Rajma Chawal Deluxe', 'Kidney Beans', 0.12
+    UNION ALL SELECT 'Punjabi Rajma Chawal Deluxe', 'Basmati Long Grain Rice', 0.10
+    UNION ALL SELECT 'Punjabi Rajma Chawal Deluxe', 'Fresh Tomatoes', 0.06
+    UNION ALL SELECT 'Punjabi Rajma Chawal Deluxe', 'Potatoes & Onions (Aloo-Pyaaz)', 0.04
+    UNION ALL SELECT 'Punjabi Rajma Chawal Deluxe', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Fresh Chicken', 0.18
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Basmati Long Grain Rice', 0.10
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Fresh Tomatoes', 0.08
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Amul Salted Butter & Cream', 0.03
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Amul Taaza Whole Milk', 0.05
+    UNION ALL SELECT 'Butter Chicken with Jeera Rice', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Hot Gulab Jamun with Rabri (2 Pcs)', 'Khoya', 0.08
+    UNION ALL SELECT 'Hot Gulab Jamun with Rabri (2 Pcs)', 'Amul Taaza Whole Milk', 0.05
+    UNION ALL SELECT 'Hot Gulab Jamun with Rabri (2 Pcs)', 'Granulated Sugar', 0.03
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Eggs', 2.00
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Fresh Pav Bread Buns', 1.00
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Fresh Tomatoes', 0.04
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Potatoes & Onions (Aloo-Pyaaz)', 0.04
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Amul Salted Butter & Cream', 0.01
+    UNION ALL SELECT 'Anda Bhurji Pav', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Eggs', 2.00
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Bread Slices', 2.00
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Fresh Tomatoes', 0.04
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Potatoes & Onions (Aloo-Pyaaz)', 0.03
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Amul Salted Butter & Cream', 0.01
+    UNION ALL SELECT 'Masala Omelette & Toast', 'Garam Masala & Indian Spices Mix', 0.01
+    UNION ALL SELECT 'Egg Paratha Roll', 'Eggs', 1.00
+    UNION ALL SELECT 'Egg Paratha Roll', 'Whole Wheat Flour', 0.12
+    UNION ALL SELECT 'Egg Paratha Roll', 'Potatoes & Onions (Aloo-Pyaaz)', 0.04
+    UNION ALL SELECT 'Egg Paratha Roll', 'Fresh Curd', 0.02
+    UNION ALL SELECT 'Egg Paratha Roll', 'Cooking Oil', 0.01
+    UNION ALL SELECT 'Egg Paratha Roll', 'Garam Masala & Indian Spices Mix', 0.01
+) recipe
+JOIN menu_items menu_item ON menu_item.name = recipe.menu_name
+JOIN inventory inventory_item ON inventory_item.ingredient_name = recipe.ingredient_name
+WHERE NOT EXISTS (
+    SELECT 1 FROM menu_item_ingredients existing
+    WHERE existing.menu_item_id = menu_item.id AND existing.inventory_id = inventory_item.id
+);

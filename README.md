@@ -27,7 +27,7 @@ A high-performance, real-time, touch-optimized **Campus Bites canteen management
 
 ### 3. ⚙️ Non-Technical Owner & Admin Dashboard (`/admin.html`)
 - **⚡ One-Tap Availability Toggle:** Large tactile toggle switches to flip items between `"🟢 IN STOCK"` and `"🔴 SOLD OUT"`. Broadcasts instantly via WebSocket to all connected student phones without page refresh!
-- **📦 Raw Ingredient Inventory & Alerts:** Orders consume configured per-serving recipe quantities; low-stock warnings appear when an ingredient crosses its minimum threshold.
+- **📦 Raw Ingredient Inventory & Alerts:** Each menu item has a per-serving recipe. Placing an order deducts the required ingredient quantities, multiplied by the ordered amounts. Orders are rejected if any required ingredient is out of stock. Low-stock alerts are sent when an ingredient crosses its configured minimum threshold; inventory can be restocked or adjusted from the admin dashboard. Expiry tracking is not enabled.
 - **📊 Visual Analytics (Chart.js):**
   - **Peak Rush Times:** Hourly order curve visualizing breakfast, lunch, and evening spikes.
   - **Top-Selling Dishes:** Horizontal bar chart comparing sales volume.
@@ -38,7 +38,7 @@ A high-performance, real-time, touch-optimized **Campus Bites canteen management
 
 ## 🗄️ Database Architecture (MySQL Community Edition)
 
-The full DDL schema is located in [`src/main/resources/schema.sql`](file:///d:/java%20project/src/main/resources/schema.sql) and sample seed data in [`src/main/resources/data.sql`](file:///d:/java%20project/src/main/resources/data.sql).
+The full DDL schema is located in [`src/main/resources/schema.sql`](src/main/resources/schema.sql) and sample seed data in [`src/main/resources/data.sql`](src/main/resources/data.sql).
 
 ### Relational Tables:
 1. **`users`**: Campus students, staff, and canteen administrators.
@@ -47,8 +47,9 @@ The full DDL schema is located in [`src/main/resources/schema.sql`](file:///d:/j
 4. **`orders`**: Order tickets with token numbers (`#ORD-XXX`), pickup times, total amounts, and payment methods.
 5. **`order_items`**: Line items for each order ticket.
 6. **`inventory`**: Raw ingredients with current stock, units (kg, L, pcs), and minimum alert thresholds.
-7. **`menu_item_ingredients`**: Ingredient quantities consumed for one serving of each menu item.
+7. **`menu_item_ingredients`**: Ingredient quantities consumed for one serving of each menu item, in the corresponding inventory item's unit.
 8. **`notification_logs`**: Audit trail of automated SMS/Push alerts dispatched to students.
+9. **`app_data_migrations`**: Records one-time seed-data adjustments so startup does not reset live inventory.
 
 ---
 
@@ -60,11 +61,13 @@ The full DDL schema is located in [`src/main/resources/schema.sql`](file:///d:/j
 
 ### Running the Application:
 ```bash
-# 1. Clone or navigate to the project directory:
-cd "d:/java project"
+# Navigate to the repository root, then run with the Maven wrapper:
 
-# 2. Build and run using Maven:
-mvn spring-boot:run
+# Windows:
+mvnw.cmd spring-boot:run
+
+# macOS / Linux:
+./mvnw spring-boot:run
 ```
 
 ### Accessing the Portals:
@@ -73,7 +76,7 @@ mvn spring-boot:run
 | **Student Mobile Portal** | `http://localhost:8080/` | Menu catalog, 2-click checkout & live order tracker |
 | **Kitchen KDS** | `http://localhost:8080/kds.html` | Tablet order board with audio chime & one-tap actions |
 | **Owner / Admin Panel** | `http://localhost:8080/admin.html` | Real-time stock toggles, inventory & sales charts |
-| **Database Console** | `http://localhost:8080/h2-console` | JDBC URL: `jdbc:h2:mem:canteen_db`, User: `sa`, Pwd: *(blank)* |
+| **Database Console** | `http://localhost:8080/h2-console` | JDBC URL: `jdbc:h2:file:./data/canteen_db`, User: `sa`, Pwd: *(blank)* |
 
 ---
 
@@ -88,7 +91,7 @@ mvn spring-boot:run
 | `/topic/orders` | `ORDER_CREATED`, `ORDER_STATUS_CHANGED` | Kitchen KDS, Student Tracker, Admin Dashboard |
 | `/topic/order/{orderNumber}` | Single order status stream | Student Live Tracker Modal |
 | `/topic/menu-updates` | `MENU_TOGGLED` | Student Catalog (Auto Sold-Out Disable) |
-| `/topic/inventory-alerts` | `LOW_STOCK_WARNING` | Admin Dashboard |
+| `/topic/inventory-alerts` | `LOW_STOCK_WARNING` when stock crosses its minimum threshold | Admin Dashboard |
 | `/topic/notifications` | `SMS_SENT` | Admin Audit Log & Student SMS Simulator |
 
 ---
@@ -102,7 +105,9 @@ mvn spring-boot:run
 - `PATCH /api/orders/{id}/status` - Update ticket status (`NEW` -> `PREPARING` -> `READY` -> `COMPLETED`)
 - `GET /api/wallet/user/{userId}` - Fetch RFID wallet balance
 - `POST /api/wallet/user/{userId}/recharge` - Top up wallet balance
-- `GET /api/inventory` - List ingredients & threshold indicators
-- `POST /api/inventory/{id}/adjust` - Adjust stock amount (`+` or `-`)
+- `GET /api/inventory` - List ingredients, current stock, and threshold indicators
+- `GET /api/inventory?lowStockOnly=true` - List ingredients at or below their minimum threshold
+- `POST /api/inventory` - Add an ingredient (name, starting stock, unit, minimum threshold, and optional unit cost)
+- `POST /api/inventory/{id}/adjust` - Adjust stock amount (`+` to add, `-` to deduct)
 - `GET /api/dashboard/stats` - Aggregate KPI metrics & chart data
 - `GET /api/notifications/logs` - Retrieve automated notification audit logs

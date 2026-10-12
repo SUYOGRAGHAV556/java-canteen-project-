@@ -142,16 +142,27 @@ function renderMenuItems() {
         return true;
     });
 
-    document.getElementById('itemsCountBadge').textContent = `Showing ${filtered.length} authentic dish${filtered.length === 1 ? '' : 'es'}`;
+    document.getElementById('itemsCountBadge').textContent = state.menuItems.length === 0
+        ? 'Menu temporarily unavailable'
+        : `Showing ${filtered.length} authentic dish${filtered.length === 1 ? '' : 'es'}`;
 
     if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="col-span-full py-16 text-center text-slate-400 bg-white rounded-3xl p-8 border border-slate-100 shadow-xs">
-                <div class="text-3xl mb-2">🍽️</div>
-                <p class="font-bold text-slate-700 mb-1">No dishes found matching your filters</p>
-                <p class="text-xs text-slate-400">Try changing your search term or category pills above.</p>
-            </div>
-        `;
+        container.innerHTML = state.menuItems.length === 0
+            ? `
+                <div class="col-span-full py-16 text-center text-slate-400 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+                    <div class="text-3xl mb-2">🍽️</div>
+                    <p class="font-bold text-slate-700 mb-1">The menu is temporarily unavailable</p>
+                    <p class="text-xs text-slate-400 mb-4">Please try loading the menu again in a moment.</p>
+                    <button onclick="fetchMenuItems()" class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition">Reload menu</button>
+                </div>
+            `
+            : `
+                <div class="col-span-full py-16 text-center text-slate-400 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+                    <div class="text-3xl mb-2">🍽️</div>
+                    <p class="font-bold text-slate-700 mb-1">No dishes found matching your filters</p>
+                    <p class="text-xs text-slate-400">Try changing your search term or category pills above.</p>
+                </div>
+            `;
         return;
     }
 
@@ -161,7 +172,7 @@ function renderMenuItems() {
         const isSoldOut = !item.available;
 
         return `
-            <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between relative overflow-hidden ${isSoldOut ? 'opacity-65 grayscale-20 bg-slate-50' : ''}">
+            <article class="group bg-white rounded-[1.75rem] p-3 border border-slate-200/80 shadow-sm hover:shadow-xl hover:shadow-orange-900/10 hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden h-full ${isSoldOut ? 'opacity-65 grayscale-20 bg-slate-50' : ''}">
                 
                 <!-- Sold Out Banner -->
                 ${isSoldOut ? `
@@ -171,12 +182,13 @@ function renderMenuItems() {
                 ` : ''}
 
                 <!-- Food Thumbnail Image -->
-                <div class="relative w-full h-44 rounded-2xl overflow-hidden mb-3 bg-slate-100 group">
+                <div class="relative w-full h-48 rounded-[1.35rem] overflow-hidden mb-3 bg-slate-100">
                     <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'}"
                          alt="${item.name}" 
                          loading="lazy"
                          onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500';"
-                         class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                         class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-950/40 to-transparent"></div>
                     
                     <!-- Dietary Tag & Prep Badge -->
                     <div class="absolute bottom-2 left-2 flex items-center gap-1.5">
@@ -192,14 +204,14 @@ function renderMenuItems() {
                 <!-- Info -->
                 <div class="flex-1 flex flex-col justify-between">
                     <div>
-                        <h3 class="font-bold text-slate-900 text-sm leading-snug mb-1">${item.name}</h3>
+                        <h3 class="font-extrabold text-slate-900 text-[15px] leading-snug mb-1.5">${item.name}</h3>
                         <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-3">${item.description || ''}</p>
                     </div>
 
                     <!-- Price & Add Stepper -->
-                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <div>
-                            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Price</span>
+                    <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                        <div class="rounded-xl bg-orange-50 px-3 py-1.5">
+                            <span class="block text-[9px] text-orange-700/70 font-bold uppercase tracking-wider">Price</span>
                             <div class="text-base font-extrabold text-slate-900">₹${Number(item.price).toFixed(2)}</div>
                         </div>
 
@@ -209,8 +221,8 @@ function renderMenuItems() {
                                 Sold Out
                             </button>
                         ` : qty === 0 ? `
-                            <button onclick="addToCart(${item.id})" class="px-4 py-2 bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 rounded-xl font-bold text-xs transition active:scale-95 flex items-center gap-1 shadow-xs">
-                                <span>+ Add Dish</span>
+                            <button onclick="addToCart(${item.id})" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-extrabold text-xs transition active:scale-95 flex items-center gap-1 shadow-md shadow-orange-500/20">
+                                <span>+ Add</span>
                             </button>
                         ` : `
                             <div class="flex items-center bg-orange-500 text-white rounded-xl shadow-md shadow-orange-500/25 p-0.5">
@@ -222,7 +234,7 @@ function renderMenuItems() {
                     </div>
                 </div>
 
-            </div>
+            </article>
         `;
     }).join('');
 }
